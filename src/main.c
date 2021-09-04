@@ -1,14 +1,12 @@
 #include "sandbox_engine.h"
 
-
-
 int main() {
-	SANDBOX sb = create_sandbox(150, 100, 5);
+	SANDBOX sb = create_sandbox();
 	if(sb == NULL) {
 		return -1;
 	}
 
-	if(init_libs(sb)) {
+	if(init_sandbox(sb)) {
 		sandbox_ready(sb);
 		sandbox_execute(sb);
 	}

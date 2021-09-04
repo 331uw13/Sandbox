@@ -2,4 +2,8 @@
 #define MATERIALS_H
 
 
+// Material ids and their properties...
+
+
+
 #endif

@@ -1,45 +1,49 @@
 #include <stdio.h>
 
 #include "sandbox.h"
+#include "shader.h"
+
+static int program_color_uniform;
 
 
-SANDBOX create_sandbox(u16 w_px, u16 h_px, u16 px_size) {
+
+void cursor_pos_callback(GLFWwindow* win, double x, double y) {
+	SANDBOX sb = (SANDBOX)glfwGetWindowUserPointer(win);
+	sb->cursor.x = x;
+	sb->cursor.y = y;
+}
+
+void key_callback(GLFWwindow* win, int key, int sc, int action, int mods) {
+	SANDBOX sb = (SANDBOX)glfwGetWindowUserPointer(win);
+
+	if(action == GLFW_PRESS) {
+		switch(key) {
+
+			case GLFW_KEY_ESCAPE:
+				sb->flags |= F_CLOSE;
+				break;
+
+
+		
+			default: break;
+		}
+	}
+
+}
+
+
+
+SANDBOX create_sandbox() {
 	SANDBOX sb = NULL;
 	if((sb = malloc(sizeof *sb))) {
+		sb->world_size = (PX_W*PX_H)*sizeof *sb->world;
+		sb->world = malloc(sb->world_size);
 		sb->flags = 0;
 		sb->win = NULL;
-		sb->pixels.x = w_px;
-		sb->pixels.y = h_px;
-		sb->px_size = px_size;
-		sb->win_size.x = px_size*w_px;
-		sb->win_size.y = px_size*h_px;
-		sb->world = 0;
-		sb->pbuffer = 0;
-		sb->vbo = 0;
+		sb->win_size.x = PX_W*PX_SIZE;
+		sb->win_size.y = PX_H*PX_SIZE;
+		sb->time = 0.0;
 
-
-		float stuff[] = {
-			-0.5f,  0.5f, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f,
-			 0.5f,  0.5f, 0.0f, 1.0f, 0.0f, 1.0f, 0.0f,
-			 0.5f, -0.5f, 0.0f, 0.0f, 1.0f, 1.0f, 1.0f,
-			-0.5f, -0.5f, 1.0f, 1.0f, 1.0f, 0.0f, 1.0f 
-		};
-
-		glGenBuffers(1, &sb->vbo);
-		//glBindBuffer(GL_ARRAY_BUFFER, sb->vbo);
-		//glBufferData(GL_ARRAY_BUFFER, sizeof stuff, stuff, GL_STATIC_DRAW);
-
-		/*
-		glGenTextures(1, &sb->world);
-		glBindTexture(GL_TEXTURE_2D, sb->world);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, sb->win_size.x, sb->win_size.y, 0, GL_RGB, GL_FLOAT, NULL);
-		*/
-
-		//glGenBuffers(1, &sb->pbuffer);
-		//glBindBuffer(GL_PIXEL_PACK_BUFFER, sb->pbuffer);
-		//glBufferData(GL_PIXEL_PACK_BUFFER, sb->win_size.x*sb->win_size.y, NULL, GL_STREAM_DRAW);
 	}
 	else {
 		fprintf(stderr, "Failed to allocate %li bytes of memory! for 'SANDBOX'\n", sizeof *sb);
@@ -47,7 +51,6 @@ SANDBOX create_sandbox(u16 w_px, u16 h_px, u16 px_size) {
 
 	return sb;
 }
-
 
 
 void destroy_sandbox(SANDBOX sb) {
@@ -58,15 +61,13 @@ void destroy_sandbox(SANDBOX sb) {
 			}
 			glfwTerminate();
 		}
-		if(sb->flags & F_INIT_GLEW) {
-			glDeleteTextures(1, &sb->world);
-		}
+		free(sb->world);
 		free(sb);
 	}
 }
 
 
-int init_libs(SANDBOX sb) {
+int init_sandbox(SANDBOX sb) {
 	int res = 0;
 
 	if(sb != NULL) {
@@ -80,6 +81,9 @@ int init_libs(SANDBOX sb) {
 		}
 		
 		sb->flags |= F_INIT_GLFW;
+		glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_COMPAT_PROFILE);
+		glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
+		glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 2);
 		glfwWindowHint(GLFW_RESIZABLE, 0);
 		glfwWindowHint(GLFW_CENTER_CURSOR, 1);
 		glfwWindowHint(GLFW_DOUBLEBUFFER, 1);
@@ -92,7 +96,13 @@ int init_libs(SANDBOX sb) {
 		}
 
 		glfwMakeContextCurrent(sb->win);
-		
+		glfwSetInputMode(sb->win, GLFW_CURSOR, GLFW_CURSOR_HIDDEN);
+		glfwSwapInterval(1);
+		glfwSetWindowUserPointer(sb->win, sb);
+
+		glfwSetCursorPosCallback(sb->win, cursor_pos_callback);
+		glfwSetKeyCallback(sb->win, key_callback);
+
 
 		// Initialize GLEW
 
@@ -104,6 +114,23 @@ int init_libs(SANDBOX sb) {
 
 		sb->flags |= F_INIT_GLEW;
 		res = 1;
+
+
+		// Create shaders
+
+		int shaders[] = {
+			compile_shader(VERTEX_SHADER_SRC, GL_VERTEX_SHADER),
+			compile_shader(FRAGMENT_SHADER_SRC, GL_FRAGMENT_SHADER)
+		};
+
+		if((sb->program = create_program(shaders, sizeof shaders)) > 0) {
+			program_color_uniform = glGetUniformLocation(sb->program, "color");
+		}
+		
+		glDeleteProgram(shaders[0]);
+		glDeleteProgram(shaders[1]);
+
+		glPointSize(PX_SIZE);
 	}
 
 
@@ -112,10 +139,66 @@ finish:
 }
 
 void update_frame(SANDBOX sb) {
-	glfwSwapBuffers(sb->win);
 	glfwPollEvents();
-	glClear(GL_COLOR_BUFFER_BIT);
+	glfwSwapBuffers(sb->win);
 }
+
+void draw_pixel(SANDBOX sb, int col, int row, u8 on_grid) {
+	glBegin(GL_POINTS);
+	if(on_grid) {
+		col *= PX_SIZE;
+		row *= PX_SIZE;
+	}
+	glVertex2f(((float)col/((float)sb->win_size.x/2))-1.0, 1.0-(float)row/((float)sb->win_size.y/2));
+	glEnd();
+}
+
+void use_color(float r, float g, float b) {
+	glUniform3f(program_color_uniform, r/COLOR_DETAIL, g/COLOR_DETAIL, b/COLOR_DETAIL);
+}
+
+void draw_line(SANDBOX sb, u16 x0, u16 y0, u16 x1, u16 y1) {
+	int width = x1-x0;
+	int height = y1-y0;
+	int dx0 = 0;
+	int dy0 = 0;
+	int dx1 = 0;
+	int dy1 = 0;
+
+	dx1 = dx0 = (width < 0) ? -1 : 1;
+	dy0 = (height < 0) ? -1 : 1;
+
+	int aw = abs(width);
+	int ah = abs(height);
+	int longest = aw;
+	int shortest = ah;
+    
+	if(longest < shortest) {
+		longest = ah;
+		shortest = aw;
+		dy1 = (height < 0) ? -1 : 1;
+		dx1 = 0;
+	}
+	
+	int numerator = longest >> 1;
+	
+	for(int i = 0; i < longest; i++) {
+		draw_pixel(sb, x0, y0, 1);
+		numerator += shortest;
+		if(numerator > longest) {
+			numerator -= longest;
+			x0 += dx0;
+			y0 += dy0;
+		}
+		else {
+			x0 += dx1;
+			y0 += dy1;
+		}
+	}
+	
+}
+
+
 
 
 
