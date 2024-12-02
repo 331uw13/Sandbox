@@ -327,7 +327,6 @@ int init_sandbox(struct sandbox_t* sbox, int width, int height, const char* wind
 
 
     // initialize pixel structure
-    // it works by creating vertex array object
     // allocating enough memory to hold max_col * max_row number of pixels
     // and then mapping the buffer before calling 'update_callback' in main loop.
     // user can then update pixel positions very efficiently
