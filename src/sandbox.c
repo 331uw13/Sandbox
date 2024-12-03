@@ -9,7 +9,6 @@ void run_sandbox(struct sandbox_t* sbox,
         void(*loop_callback)(struct sandbox_t* sbox, void*), void* userptr) {
     
 
-    glPointSize(4);
 
     while(!glfwWindowShouldClose(sbox->win) && sbox->running) {
         const double t_framestart = glfwGetTime();
@@ -84,12 +83,11 @@ void run_sandbox(struct sandbox_t* sbox,
         }
 
 
-        sbox->pixels.num_pixels = 0;
-
         sbox->mouse_scroll = 0;
         sbox->mouse_left_down = 0;
         sbox->mouse_right_down = 0;
         sbox->mouse_middle_down = 0;
+
 
         glfwSwapBuffers(sbox->win);
         
@@ -178,6 +176,7 @@ int init_sandbox(struct sandbox_t* sbox, int width, int height, const char* wind
     sbox->dt = 0.0;
     sbox->mouse_col = 0.0;
     sbox->mouse_row = 0.0;
+    sbox->mouse_scroll = 0;
     sbox->flags = 0;
     sbox->render_mode = RENDERMODE_POLL_EVENTS;
 
@@ -206,6 +205,7 @@ int init_sandbox(struct sandbox_t* sbox, int width, int height, const char* wind
         goto error;
     }
 
+    glPointSize(PIXELSIZE);
     glfwSwapInterval(1);
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
@@ -226,7 +226,6 @@ int init_sandbox(struct sandbox_t* sbox, int width, int height, const char* wind
         .vbo = 0,
         .buffer = NULL,
         .buffer_sizeb = 0,
-        .num_pixels = 0,
         .num_maxpixels = 0
     };
 
@@ -326,7 +325,7 @@ int init_sandbox(struct sandbox_t* sbox, int width, int height, const char* wind
     }
 
 
-    // initialize pixel structure
+    // initialize pixel structure.
     // allocating enough memory to hold max_col * max_row number of pixels
     // and then mapping the buffer before calling 'update_callback' in main loop.
     // user can then update pixel positions very efficiently
@@ -548,30 +547,28 @@ void setpixel(struct sandbox_t* sbox, float x, float y,
     x = floorf(x);
     y = floorf(y);
 
+    if(x * y < 0) { // discard any negative coordinate
+        return;
+    }
+
+    if(x >= sbox->max_col) {
+        return;
+    }
+    if(y >= sbox->max_row) {
+        return;
+    }
+
+
     size_t index = (int)y * sbox->max_col + (int)x;
 
     if((index < sbox->pixels.num_maxpixels) && sbox->pixels.buffer) {
-
-        //printf("%x / %x\n", sbox->num_maxpixels, index);
-
         index *= 5;
-
         sbox->pixels.buffer[index]   = map(x, 0.0, sbox->max_col, -1.0,  1.0);
         sbox->pixels.buffer[index+1] = map(y, 0.0, sbox->max_row,  1.0, -1.0);
         sbox->pixels.buffer[index+2] = r;
         sbox->pixels.buffer[index+3] = g;
         sbox->pixels.buffer[index+4] = b;
-        sbox->pixels.num_pixels++;
     }
-
-    /*
-    glBindTexture(sbox->ptex, GL_TEXTURE_2D);
-
-    float rgb[4] = { r, g, b, 1.0 };
-    glTexSubImage2D(GL_TEXTURE_2D, 0, (int)x, sbox->max_row - (int)y, 1, 1, 
-            GL_RGB, GL_FLOAT, rgb);
-      
-            */
 }
 
 void fillcircle(struct sandbox_t* sbox, 
@@ -643,5 +640,22 @@ void setline(struct sandbox_t* sbox,
             y0 += dy1;
         }
     }
+}
+
+void setbox(struct sandbox_t* sbox,
+        float x, float y, float w, float h,
+        float r, float g, float b)
+{
+    const int width = (int)floorf(w);
+    const int height = (int)floorf(h);
+    const int ix = (int)floorf(x);
+    const int iy = (int)floorf(y);
+
+    for(int by = 0; by < height; by++) {
+        for(int bx = 0; bx < width; bx++) {
+            setpixel(sbox, ix+bx, iy+by, r, g, b);
+        }
+    }
+
 }
 

@@ -142,7 +142,7 @@ void setup(struct sandbox_t* sbox) {
             0.55,  /* blue */
             0.5,   /* strength */
             50.0,  /* radius */
-            2.0    /* effect */
+            1.0    /* effect */
             );
     
     g_light_selected = mylight_A;

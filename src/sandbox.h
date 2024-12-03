@@ -45,6 +45,8 @@
 #define GLSL_VERSION "#version 430\n"
 #include "shaders.h"
 
+#define CLAMP(t, min, max) ((t < min) ? min : (t > max) ? max : t)
+
 
 struct effect_t {
     unsigned int vao;
@@ -66,8 +68,7 @@ struct pixels_t {
     unsigned int shader;
     float* buffer;
     size_t buffer_sizeb;
-    size_t num_pixels;  // TODO NOT NEEDED 
-    size_t num_maxpixels; // number of max pixels can be drawn.
+    size_t num_maxpixels;
 };
 
 struct sandbox_t {
@@ -85,28 +86,6 @@ struct sandbox_t {
 
     struct pixels_t pixels;
     struct effect_t effect;
-
-    /*
-    unsigned int p_vbo;
-    unsigned int p_vao;
-
-    float* buffer;
-    size_t buffer_sizeb;
-
-    */
-    /*
-    unsigned int vbo; // vertex buffer object.
-    unsigned int vao; // vertex array object.
-    unsigned int ebo; // element buffer object.
-    unsigned int ubo; // uniform buffer object.
-    unsigned int ptex; // TODO NOT NEEDED
-    
-    unsigned int pixelshdr;
-    unsigned int defshdr;
-    */
-
-    //int defshdr_unilocs[MAX_UNILOCS]; 
-   
 
     double time;
     double dt;  // delta time (previous frame time)
@@ -166,6 +145,7 @@ void show_cursor(struct sandbox_t* sbox, int mode);
 
 #define RAYCAST_AIRID 0
 
+
 int allocate_rcbuf(struct sandbox_t* sbox);
 void free_rcbuf(struct sandbox_t* sbox);
 
@@ -191,10 +171,9 @@ void setline(struct sandbox_t* sbox,
         int x0, int y0, int x1, int y1,
         float r, float g, float b);
 
-
-
-
-
+void setbox(struct sandbox_t* sbox,
+        float x, float y, float w, float h,
+        float r, float g, float b);
 
 
 

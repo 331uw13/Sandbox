@@ -123,11 +123,12 @@ GLSL_VERSION
 
     "float strength = 12.0-(STRENGTH+10.0);"
 
-    "l = pow(l, strength) * 0.9;"
+    "l = pow(l, strength) * 0.3;"
     "l = 1.0 / l;"
     "lcolor.xyz = lights[i].color.xyz * l;"
 
     // this will be radius where the voronoise can take effect.
+    // to be honest this is kind of cursed, but it works.
     "float d0 = 1.0-dist*(5.85/l);"
     "float r = clamp(d0, 0.0, 1.0);"
 
