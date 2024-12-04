@@ -1,5 +1,5 @@
 # Sandbox
-* Easy to use efficient pixel graphics.
+* Easy to use efficient 2D pixel graphics with OpenGL
 
 todo: create documantation.
 
