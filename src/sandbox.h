@@ -46,7 +46,8 @@
 #include "shaders.h"
 
 #define CLAMP(t, min, max) ((t < min) ? min : (t > max) ? max : t)
-
+#define MIN(a, b) (a < b ? a : b)
+#define MAX(a, b) (a > b ? a : b)
 
 struct effect_t {
     unsigned int vao;
@@ -140,6 +141,7 @@ float vlength(float x, float y);
 float vangle(float x0, float y0, float x1, float y1);
 size_t getindexp(struct sandbox_t* sbox, int x, int y);
 void show_cursor(struct sandbox_t* sbox, int mode);
+
 
 //  ---- RAYCAST FUNCTIONS ----
 

@@ -436,6 +436,7 @@ void show_cursor(struct sandbox_t* sbox, int mode) {
     glfwSetInputMode(sbox->win, GLFW_CURSOR, (mode) ? GLFW_CURSOR_NORMAL : GLFW_CURSOR_HIDDEN);
 }
 
+
 // RAYCAST FUNCTIONS
 
 int allocate_rcbuf(struct sandbox_t* sbox) {
@@ -575,6 +576,11 @@ void fillcircle(struct sandbox_t* sbox,
         float fx, float fy, float radius,
         float r, float g, float b)
 {
+
+    if(radius == 1.0) {
+        setpixel(sbox, fx, fy, r, g, b);
+        return;
+    }
 
     int ystart = fy - radius;
     int yend   = fy + radius;
