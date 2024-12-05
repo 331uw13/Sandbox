@@ -1,34 +1,25 @@
 #include <stdio.h>
 #include <math.h>
 #include <stdlib.h>
+#include <unistd.h>
+#include <string.h>
+#include <fcntl.h>
 
 #include "../../src/sandbox.h"
 
-static long int TEX_MAX_WIDTH;
-static long int TEX_MAX_HEIGHT;
+static long int TEX_MAX_COLUMN;
+static long int TEX_MAX_ROW;
 
-#define COLORPALETTE_MAX 16
+#define COLORPALETTE_MAX 20
 #define COLORPALETTE_BOX 6
 
 // x position where cursor is detected to be on color palette
 #define MOUSE_ON_COLORPALETTE_TRESHOLD 16
 
 
-static int g_grid_zoom;
-static int g_grid_x;
-static int g_grid_y;
 
-static int g_mouse_prev_col;
-static int g_mouse_prev_row;
-
-static int g_show_grid;
-static int g_mode;
-static int g_erase_size;
-static int g_draw_size;
-static int g_color_modify_visible;
-
-#define MODE_DRAW 0
-#define MODE_ERASE 1
+// TODO: rewrite this whole thing someday.
+// ----
 
 
 struct texpixel_t {
@@ -58,6 +49,22 @@ struct slider_t {
     float b;
 };
 
+static int g_grid_zoom;
+static int g_grid_x;
+static int g_grid_y;
+
+static int g_mouse_prev_col;
+static int g_mouse_prev_row;
+
+static int g_show_grid;
+static int g_mode;
+static int g_erase_size;
+static int g_draw_size;
+static int g_color_modify_visible;
+
+#define MODE_DRAW 0
+#define MODE_ERASE 1
+
 
 static struct texpixel_t* g_texdata;
 
@@ -73,10 +80,16 @@ static struct slider_t g_sliders[MAX_SLIDERS];
 static size_t g_num_sliders;
 static long int g_current_slider_index;
 
+#define TEXFILEPATH_MAX 255
+static char g_texfilepath[TEXFILEPATH_MAX] = { 0 };
+static size_t g_texfilepath_size;
+
 #define SLIDER_SX 30
 #define SLIDER_SY 5
 #define SLIDER_WIDTH 50
 #define SLIDER_HEIGHT 7
+
+
 
 void add_slider(int x, int y, int width, float* valueptr, float min, float max,
         float r, float g, float b) {
@@ -133,7 +146,7 @@ void init_sliders() {
 }
 
 
-void update_sliders(struct sandbox_t* sbox) {
+void update_sliders(struct sbp_t* sbox) {
     
     struct slider_t* s = NULL;
     int mouse_left_hold = glfwGetMouseButton(sbox->win, GLFW_MOUSE_BUTTON_LEFT);
@@ -187,8 +200,8 @@ void get_texpixels_from_circle(
     }
 
     if(radius == 1) {
-        size_t tpindx = (size_t)(iy * TEX_MAX_WIDTH + ix);
-        if(tpindx < (size_t)(TEX_MAX_WIDTH * TEX_MAX_HEIGHT)) {
+        size_t tpindx = (size_t)(iy * TEX_MAX_COLUMN + ix);
+        if(tpindx < (size_t)(TEX_MAX_COLUMN * TEX_MAX_ROW)) {
             callback(&g_texdata[tpindx]);
         }
         return;
@@ -208,7 +221,7 @@ void get_texpixels_from_circle(
         for(int x = xstart; x <= xend; x++) {
   
             if(x*y < 0) { continue; }
-            if(x >= TEX_MAX_WIDTH) { continue; }
+            if(x >= TEX_MAX_COLUMN) { continue; }
 
             float dst = vdistance(x+0.5, y+0.5, ix, iy);
 
@@ -216,8 +229,8 @@ void get_texpixels_from_circle(
                 continue;
             }
 
-            size_t tpindx = (size_t)(y * TEX_MAX_WIDTH + x);
-            if(tpindx > (size_t)(TEX_MAX_WIDTH * TEX_MAX_HEIGHT)) {
+            size_t tpindx = (size_t)(y * TEX_MAX_COLUMN + x);
+            if(tpindx > (size_t)(TEX_MAX_COLUMN * TEX_MAX_ROW)) {
                 continue;
             }
 
@@ -258,9 +271,9 @@ void handle_user_grid_click(int x, int y) {
     }
 
     size_t texdata_index =
-        (y * TEX_MAX_WIDTH + x);
+        (y * TEX_MAX_COLUMN + x);
 
-    if(texdata_index > (TEX_MAX_WIDTH * TEX_MAX_HEIGHT)) {
+    if(texdata_index > (size_t)(TEX_MAX_COLUMN * TEX_MAX_ROW)) {
         return;
     }
 
@@ -331,7 +344,7 @@ void update_sliders_valueptrs() {
     g_sliders[2].valueptr = &g_current_color->blu;
 }
 
-void handle_colorpalette_click(struct sandbox_t* sbox, 
+void handle_colorpalette_click(struct sbp_t* sbox, 
         int colorpalette_y, int colorpalette_height) {
 
     size_t index = (sbox->mouse_row - colorpalette_y) / (COLORPALETTE_BOX+1);
@@ -347,7 +360,7 @@ void handle_colorpalette_click(struct sandbox_t* sbox,
 }
 
 
-void loop(struct sandbox_t* sbox, void* ptr) {
+void loop(struct sbp_t* sbox, void* ptr) {
 
 
     if(glfwGetKey(sbox->win, GLFW_KEY_V) || g_color_modify_visible) {
@@ -396,15 +409,15 @@ void loop(struct sandbox_t* sbox, void* ptr) {
         }
     }
 
-    const int texhalfwidth = (TEX_MAX_WIDTH * g_grid_zoom) / 2;
-    const int texhalfheight = (TEX_MAX_HEIGHT * g_grid_zoom) / 2;
+    const int texhalfwidth = (TEX_MAX_COLUMN * g_grid_zoom) / 2;
+    const int texhalfheight = (TEX_MAX_ROW * g_grid_zoom) / 2;
 
     const int grid_pos_x = g_grid_x - texhalfwidth;
     const int grid_pos_y = g_grid_y - texhalfheight;
 
     // draw grid
-    for(int gy = 0; gy < TEX_MAX_HEIGHT; gy++) {
-        for(int gx = 0; gx < TEX_MAX_WIDTH; gx++) {
+    for(int gy = 0; gy < TEX_MAX_ROW; gy++) {
+        for(int gx = 0; gx < TEX_MAX_COLUMN; gx++) {
  
 
             float r = 0.0;
@@ -412,7 +425,7 @@ void loop(struct sandbox_t* sbox, void* ptr) {
             float b = 0.0;
 
 
-            struct texpixel_t* tp = &g_texdata[gy * TEX_MAX_WIDTH + gx];
+            struct texpixel_t* tp = &g_texdata[gy * TEX_MAX_COLUMN + gx];
 
             if(tp->active) {
                 r = tp->red;
@@ -509,8 +522,8 @@ void loop(struct sandbox_t* sbox, void* ptr) {
                 long int x = ((sbox->mouse_col - g_grid_x + texhalfwidth) / g_grid_zoom);
                 long int y = ((sbox->mouse_row - g_grid_y + texhalfheight) / g_grid_zoom);
                 
-                if((x >= 0) && (y >= 0) && (x < TEX_MAX_WIDTH) && (y < TEX_MAX_HEIGHT)
-                && (p_x >= 0) && (p_y >= 0) && (p_x < TEX_MAX_WIDTH) && (p_y < TEX_MAX_HEIGHT)) {
+                if((x >= 0) && (y >= 0) && (x < TEX_MAX_COLUMN) && (y < TEX_MAX_ROW)
+                && (p_x >= 0) && (p_y >= 0) && (p_x < TEX_MAX_COLUMN) && (p_y < TEX_MAX_ROW)) {
                     if(x == p_x && y == p_y) {
                         handle_user_grid_click(x, y);
                     }
@@ -595,9 +608,9 @@ void loop(struct sandbox_t* sbox, void* ptr) {
 
 void dump_texture_data_stdout() {
     
-    for(int y = 0; y < TEX_MAX_HEIGHT; y++) {
-        for(int x = 0; x < TEX_MAX_WIDTH; x++) {
-            size_t i = y * TEX_MAX_WIDTH + x;
+    for(int y = 0; y < TEX_MAX_ROW; y++) {
+        for(int x = 0; x < TEX_MAX_COLUMN; x++) {
+            size_t i = y * TEX_MAX_COLUMN + x;
             if(!g_texdata[i].active) { continue; }
             printf("%li | XY(%i, %i) | RGB(%0.2f, %0.2f, %0.2f)\n",
                     i,
@@ -607,33 +620,13 @@ void dump_texture_data_stdout() {
     }
 }
 
-/*
 
-   texture file structure:
-
-
-   first 4 bytes: texture width.
-   second 4 bytes: texture height.
-
-   1 segment contains
-    - red value
-    - green value
-    - blue value
-    - pixel x position
-    - pixel y position
-
-    these segments are next to each other until end of file
-
-*/
-
-
-
-
+void write_texdata();
 
 static void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods) {
     if(action != GLFW_PRESS) { return; }
 
-    struct sandbox_t* sbox = (struct sandbox_t*)glfwGetWindowUserPointer(window);
+    struct sbp_t* sbox = (struct sbp_t*)glfwGetWindowUserPointer(window);
     if(!sbox) {
         fprintf(stderr, "%s: glfwGetWindowUserPointer failed!\n",
                 __func__);
@@ -704,11 +697,15 @@ static void key_callback(GLFWwindow* window, int key, int scancode, int action, 
     else { 
         switch(key) {
 
+            case GLFW_KEY_S:
+                write_texdata();
+                break;
+
             case GLFW_KEY_N:
                 if(glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_RIGHT)
                         == GLFW_PRESS)
                 {
-                    for(int i = 0; i < (TEX_MAX_WIDTH * TEX_MAX_HEIGHT); i++) {
+                    for(int i = 0; i < (TEX_MAX_COLUMN * TEX_MAX_ROW); i++) {
                         struct texpixel_t* tp = &g_texdata[i];
                         tp->red = 0.0;
                         tp->grn = 0.0;
@@ -738,7 +735,7 @@ void print_control_desc_sub(const char* control, const char* name) {
 
 void print_controls() {
 
-    printf("---( Texture editor controls )---\n");
+    printf("---( TexEdit controls )---\n");
     
     print_control_desc("CONTROL + TAB", "Center grid position.");
     print_control_desc("MOUSE MID BUTTON + DRAG", "Drag grid.");
@@ -754,14 +751,28 @@ void print_controls() {
     print_control_desc_sub("1", "Dim selected color.");
     print_control_desc_sub("2", "Brighten selected color.");
     print_control_desc("MOUSE SCROLL + V", "Select color from palette.");
+    print_control_desc("CONTROL + S", "Save.");
 
     printf("---------------------------------\n");
+}
 
+
+void print_usage_desc(const char* what, const char* desc) {
+    printf(" \033[36m%s \033[0m%s\n", what, desc);
+}
+
+void print_usage(const char* firstarg) {
+    printf("\n");
+    
+    print_usage_desc(firstarg, "(Existing Filepath)");
+    print_usage_desc(firstarg, "(New Filepath) (MaxColumns) (MaxRows)");
+
+    printf("\n");
 
 }
 
+
 void init_colorpalette() {
-    
     for(int i = 0; i < COLORPALETTE_MAX; i++) {
         
         rainbow_palette(sin((float)i*0.07),
@@ -771,31 +782,164 @@ void init_colorpalette() {
                 );
 
     }
-
     g_current_color = &g_colorpalette[0];
+}
 
+/*
+
+   texture file structure:
+
+
+   first 4 bytes: texture width.
+   second 4 bytes: texture height.
+
+   1 segment contains (in order)
+    - pixel x position
+    - pixel y position
+    - red value            rgb is from 0 to 255
+    - green value          scale it to 0.0 to 1.0 when reading texture.
+    - blue value
+
+    these segments are next to each other until end of file
+
+
+    struct texpixel_t {
+        float red;
+        float grn;
+        float blu;
+        int x;
+        int y;
+        int active;
+    };
+
+*/
+
+void write_texdata() {
+   
+    int fd = open(g_texfilepath, O_WRONLY | O_APPEND);
+    if(fd == -1) {
+        perror("open");
+        return;
+    }
+
+    size_t texsize = (size_t)(TEX_MAX_COLUMN * TEX_MAX_ROW);    
+    int buf[SB_TEXTURE_SEGMENT_SIZE] = { 0 };
+
+    for(size_t i = 0; i < texsize; i++) {
+        struct texpixel_t* tp = &g_texdata[i];
+        if(!tp->active) { continue; }
+
+
+    }
+
+
+
+    close(fd);
+    printf("saved.\n");
 }
 
 
-int main() {
+int init_from_existing_file() {
+    int result = 0;
 
-    TEX_MAX_WIDTH = 96;
-    TEX_MAX_HEIGHT = 96;
+    if(access(g_texfilepath, F_OK)) {
+        fprintf(stderr, "File '%s' doesnt exist\n", g_texfilepath);
+        goto error;
+    }
 
-    size_t texdatasize = sizeof *g_texdata * (TEX_MAX_WIDTH * TEX_MAX_HEIGHT);
+
+
+
+    result = 1;
+error:
+    return result;
+}
+
+int init_new_file(int maxcol, int maxrow) {
+    int result = 0;
+
+    if(!access(g_texfilepath, F_OK)) {
+        fprintf(stderr, "File '%s' exists. cant overwrite.\n", g_texfilepath);
+        goto error;
+    }
+
+    TEX_MAX_COLUMN = maxcol;
+    TEX_MAX_ROW = maxrow;
+
+    result = 1;
+
+error:
+    return result;
+}
+
+#define RET_SUCCESS 0
+#define RET_FAILURE 1
+
+int main(int argc, char** argv) {
+
+    if((argc <= 1) || (argc == 3) || (argc > 4)) {
+        printf("\nInvalid number of arguments\n");
+        print_usage(argv[0]);
+        return RET_FAILURE;
+    }
+
+    g_texfilepath_size = 0;
+    g_texfilepath_size = strlen(argv[1]);
+    if(g_texfilepath_size >= TEXFILEPATH_MAX) {
+        fprintf(stderr, "Filepath length too big (%li)\n",
+                g_texfilepath_size);
+        return RET_FAILURE;
+    }
+
+    memmove(g_texfilepath, argv[1], g_texfilepath_size);
+
+    if(argc == 2) {
+        if(!init_from_existing_file()) {
+            print_usage(argv[0]);
+            return RET_FAILURE;
+        }
+        printf("\033[32m +> \033[0mEditing Existing file '%s'\n",
+                g_texfilepath);
+    }
+    else if(argc == 4) {
+        const int cols = atoi(argv[2]);
+        const int rows = atoi(argv[3]);
+
+        if(cols <= 1) {
+            fprintf(stderr, "\n\033[31m Invalid (MaxColumn)\033[0m\n");
+            print_usage(argv[0]);
+            return RET_FAILURE;
+        }
+        if(rows <= 1) {
+            fprintf(stderr, "\n\033[31m Invalid (MaxRow)\033[0m\n");
+            print_usage(argv[0]);
+            return RET_FAILURE;
+        }
+
+        if(!init_new_file(cols, rows)) {
+            print_usage(argv[0]);
+            return RET_FAILURE;
+        }
+    
+        printf("\033[32m +> \033[0mEditing New file '%s' %ix%i\n",
+                g_texfilepath, cols, rows);
+    }
+
+
+    size_t texdatasize = sizeof *g_texdata * (TEX_MAX_COLUMN * TEX_MAX_ROW);
     g_texdata = NULL;
     g_texdata = malloc(texdatasize);
 
     if(!g_texdata) {
         perror("malloc");
         fprintf(stderr, "Failed to allocate memory for texture data. size too big?\n");
-        return 1;
+        return RET_FAILURE;
     }
 
 
-    struct sandbox_t sbox;
-    if(!init_sandbox(&sbox, 900, 700, "Texture Editor")) {
-        return 1;
+    struct sbp_t sbox;
+    if(!init_sandbox(&sbox, 1200, 900, "Texture Editor")) {
+        return RET_FAILURE;
     }
 
     glfwSetWindowUserPointer(sbox.win, &sbox);
@@ -818,7 +962,6 @@ int main() {
     init_sliders();
 
 
-
     glfwSetKeyCallback(sbox.win, key_callback);
 
     show_cursor(&sbox, 0);
@@ -829,11 +972,8 @@ int main() {
     free(g_texdata);
     free_sandbox(&sbox);
 
-    printf("exit 0.\n");
-    return 0;
+    printf("exit.\n");
+    return RET_SUCCESS;
 }
-
-
-
 
 
