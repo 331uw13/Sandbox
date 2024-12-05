@@ -1,12 +1,11 @@
 #include <stdio.h>
 #include <math.h>
 #include <stdlib.h>
-#include <string.h>
 
 #include "../../src/sandbox.h"
 
-static long int TEX_MAX_WIDTH = 96;
-static long int TEX_MAX_HEIGHT = 96;
+static long int TEX_MAX_WIDTH;
+static long int TEX_MAX_HEIGHT;
 
 #define COLORPALETTE_MAX 16
 #define COLORPALETTE_BOX 6
@@ -47,6 +46,18 @@ struct color_t {
     float blu;
 };
 
+struct slider_t {
+    int x;
+    int y;
+    int width;
+    float* valueptr;
+    float min;
+    float max;
+    float r; 
+    float g;
+    float b;
+};
+
 
 static struct texpixel_t* g_texdata;
 
@@ -54,6 +65,112 @@ static struct color_t
 g_colorpalette[COLORPALETTE_MAX] = { 0 };
 
 static long int g_current_colorp_index;
+static struct color_t* g_current_color;
+static struct color_t g_copied_color = { 0 };
+
+#define MAX_SLIDERS 3
+static struct slider_t g_sliders[MAX_SLIDERS];
+static size_t g_num_sliders;
+static long int g_current_slider_index;
+
+#define SLIDER_SX 30
+#define SLIDER_SY 5
+#define SLIDER_WIDTH 50
+#define SLIDER_HEIGHT 7
+
+void add_slider(int x, int y, int width, float* valueptr, float min, float max,
+        float r, float g, float b) {
+    
+    if(g_num_sliders+1 > MAX_SLIDERS) {
+        fprintf(stderr, "%s: max sliders reached.\n", __func__);
+        return;
+    }
+
+    g_sliders[g_num_sliders] = (struct slider_t) {
+        .x = x,
+        .y = y,
+        .width = width,
+        .valueptr = valueptr,
+        .min = min,
+        .max = max,
+        .r = r,
+        .g = g,
+        .b = b
+    };
+
+    g_num_sliders++;
+}
+
+
+void init_sliders() {
+
+    // RED
+    add_slider(
+            SLIDER_SX,
+            SLIDER_SY,
+            SLIDER_WIDTH,
+            &g_current_color->red, 0.0, 1.0,
+            1.0, 0.5, 0.5
+            );
+
+    // GREEN
+    add_slider(
+            SLIDER_SX,
+            SLIDER_SY + SLIDER_HEIGHT+1,
+            SLIDER_WIDTH,
+            &g_current_color->grn, 0.0, 1.0,
+            0.5, 1.0, 0.5
+            );
+
+    // BLUE
+    add_slider(
+            SLIDER_SX,
+            SLIDER_SY + (SLIDER_HEIGHT+1) * 2,
+            SLIDER_WIDTH,
+            &g_current_color->blu, 0.0, 1.0,
+            0.5, 0.5, 1.0
+            );
+}
+
+
+void update_sliders(struct sandbox_t* sbox) {
+    
+    struct slider_t* s = NULL;
+    int mouse_left_hold = glfwGetMouseButton(sbox->win, GLFW_MOUSE_BUTTON_LEFT);
+
+    if(!mouse_left_hold) {
+        // select none of the sliders to be currently active.
+        g_current_slider_index = -1; 
+    }
+
+    for(size_t i = 0; i < g_num_sliders; i++) {
+        s = &g_sliders[i];
+        if(!s) { continue; }
+
+        int mouse_on = 
+            (sbox->mouse_col > s->x && sbox->mouse_col < s->x + s->width)
+        &&  (sbox->mouse_row > s->y && sbox->mouse_row < s->y + SLIDER_HEIGHT);
+        
+        if(g_current_slider_index == -1 && mouse_on && mouse_left_hold) {
+            g_current_slider_index = i;
+        }
+
+
+        setbox(sbox, s->x, s->y, s->width+1, SLIDER_HEIGHT,
+                s->r*0.25, s->g*0.25, s->b*0.25);
+
+        float value_x = map(*s->valueptr, 0.0, 1.0, s->x, s->x+s->width);
+        setline(sbox, value_x, s->y, value_x, s->y+SLIDER_HEIGHT, s->r,s->g,s->b);
+
+    }
+
+    if(g_current_slider_index >= 0) {
+        s = &g_sliders[g_current_slider_index];
+
+        *s->valueptr = map(sbox->mouse_col - s->x, 0, s->width, 0.0, 1.0);
+        *s->valueptr = CLAMP(*s->valueptr, 0.0, 1.0);
+    }
+}
 
 
 void get_texpixels_from_circle(
@@ -70,8 +187,8 @@ void get_texpixels_from_circle(
     }
 
     if(radius == 1) {
-        size_t tpindx = iy * TEX_MAX_WIDTH + ix;
-        if(tpindx < (TEX_MAX_WIDTH * TEX_MAX_HEIGHT)) {
+        size_t tpindx = (size_t)(iy * TEX_MAX_WIDTH + ix);
+        if(tpindx < (size_t)(TEX_MAX_WIDTH * TEX_MAX_HEIGHT)) {
             callback(&g_texdata[tpindx]);
         }
         return;
@@ -99,8 +216,8 @@ void get_texpixels_from_circle(
                 continue;
             }
 
-            size_t tpindx = y * TEX_MAX_WIDTH + x;
-            if(tpindx > (TEX_MAX_WIDTH * TEX_MAX_HEIGHT)) {
+            size_t tpindx = (size_t)(y * TEX_MAX_WIDTH + x);
+            if(tpindx > (size_t)(TEX_MAX_WIDTH * TEX_MAX_HEIGHT)) {
                 continue;
             }
 
@@ -130,7 +247,11 @@ void draw_pixels_callback(struct texpixel_t* tp) {
 
 
 
-void color_grid_pixel(int x, int y) {
+void handle_user_grid_click(int x, int y) {
+
+    if(g_color_modify_visible) {
+        return;
+    }
 
     if(x * y < 0) {
         return;
@@ -184,7 +305,7 @@ void color_grid_line(int x0, int y0, int x1, int y1) {
 
     for(int i = 0; i < longest; i++) {
 
-        color_grid_pixel(x0, y0);
+        handle_user_grid_click(x0, y0);
 
         numerator += shortest;
         if(numerator > longest) {
@@ -198,6 +319,18 @@ void color_grid_line(int x0, int y0, int x1, int y1) {
         }
     }
 }
+
+void update_sliders_valueptrs() {
+    if(g_current_colorp_index >= COLORPALETTE_MAX) {
+        return;
+    }
+
+    g_current_color = &g_colorpalette[g_current_colorp_index];
+    g_sliders[0].valueptr = &g_current_color->red;
+    g_sliders[1].valueptr = &g_current_color->grn;
+    g_sliders[2].valueptr = &g_current_color->blu;
+}
+
 void handle_colorpalette_click(struct sandbox_t* sbox, 
         int colorpalette_y, int colorpalette_height) {
 
@@ -210,30 +343,24 @@ void handle_colorpalette_click(struct sandbox_t* sbox,
     }
 
     g_current_colorp_index = index;
+    update_sliders_valueptrs();
 }
 
 
 void loop(struct sandbox_t* sbox, void* ptr) {
 
 
-    if(glfwGetKey(sbox->win, GLFW_KEY_V)) {
+    if(glfwGetKey(sbox->win, GLFW_KEY_V) || g_color_modify_visible) {
         
         if(sbox->mouse_scroll > 0) {
-            if(g_current_colorp_index-1 >= 0) {
-                g_current_colorp_index--;
-            }
-            else {
-                g_current_colorp_index = COLORPALETTE_MAX-1;
-            }
+            g_current_colorp_index--;
+            g_current_colorp_index = CLAMP(g_current_colorp_index, 0, COLORPALETTE_MAX-1);
         } 
         else if(sbox->mouse_scroll < 0) {
-            if(g_current_colorp_index+1 < COLORPALETTE_MAX) {
-                g_current_colorp_index++;
-            }
-            else {
-                g_current_colorp_index = 0;
-            }
+            g_current_colorp_index++;
+            g_current_colorp_index = CLAMP(g_current_colorp_index, 0, COLORPALETTE_MAX-1);
         }
+        update_sliders_valueptrs();
     }
     else {
         g_grid_zoom += sbox->mouse_scroll;
@@ -251,6 +378,23 @@ void loop(struct sandbox_t* sbox, void* ptr) {
         drag_cursor_mod = 2;
     }
 
+    // handle color dim/brighten here because the keys must be able to be held down
+    // thats not possible in key_callback
+    // multiply with frame delta time so its same speed not depend on processor or the this program.
+    if(g_color_modify_visible) {
+        const float dimdtmult = 0.4;
+        if(glfwGetKey(sbox->win, GLFW_KEY_1) == GLFW_PRESS) {
+            g_current_color->red = CLAMP(g_current_color->red - dimdtmult * sbox->dt, 0.0, 1.0);
+            g_current_color->grn = CLAMP(g_current_color->grn - dimdtmult * sbox->dt, 0.0, 1.0);
+            g_current_color->blu = CLAMP(g_current_color->blu - dimdtmult * sbox->dt, 0.0, 1.0);
+
+        }
+        else if(glfwGetKey(sbox->win, GLFW_KEY_2) == GLFW_PRESS) {
+            g_current_color->red = CLAMP(g_current_color->red + dimdtmult * sbox->dt, 0.0, 1.0);
+            g_current_color->grn = CLAMP(g_current_color->grn + dimdtmult * sbox->dt, 0.0, 1.0);
+            g_current_color->blu = CLAMP(g_current_color->blu + dimdtmult * sbox->dt, 0.0, 1.0);
+        }
+    }
 
     const int texhalfwidth = (TEX_MAX_WIDTH * g_grid_zoom) / 2;
     const int texhalfheight = (TEX_MAX_HEIGHT * g_grid_zoom) / 2;
@@ -345,7 +489,7 @@ void loop(struct sandbox_t* sbox, void* ptr) {
     }
 
 
-    // handle mouse stuff
+    // handle mouse stuff on grid and colorpalette
     //
     {
         if(glfwGetMouseButton(sbox->win, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS) {
@@ -368,7 +512,7 @@ void loop(struct sandbox_t* sbox, void* ptr) {
                 if((x >= 0) && (y >= 0) && (x < TEX_MAX_WIDTH) && (y < TEX_MAX_HEIGHT)
                 && (p_x >= 0) && (p_y >= 0) && (p_x < TEX_MAX_WIDTH) && (p_y < TEX_MAX_HEIGHT)) {
                     if(x == p_x && y == p_y) {
-                        color_grid_pixel(x, y);
+                        handle_user_grid_click(x, y);
                     }
                     else {
                         color_grid_line(p_x, p_y, x, y);
@@ -383,6 +527,9 @@ void loop(struct sandbox_t* sbox, void* ptr) {
         }
     }
 
+    if(g_color_modify_visible) {
+        update_sliders(sbox);
+    }
 
     if(g_mode == MODE_DRAW) {
         struct color_t* color = &g_colorpalette[g_current_colorp_index];
@@ -460,6 +607,29 @@ void dump_texture_data_stdout() {
     }
 }
 
+/*
+
+   texture file structure:
+
+
+   first 4 bytes: texture width.
+   second 4 bytes: texture height.
+
+   1 segment contains
+    - red value
+    - green value
+    - blue value
+    - pixel x position
+    - pixel y position
+
+    these segments are next to each other until end of file
+
+*/
+
+
+
+
+
 static void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods) {
     if(action != GLFW_PRESS) { return; }
 
@@ -512,6 +682,23 @@ static void key_callback(GLFWwindow* window, int key, int scancode, int action, 
                 g_color_modify_visible = !g_color_modify_visible;
                 break;
 
+            case GLFW_KEY_Z:
+                if(g_color_modify_visible) {
+                    g_copied_color = (struct color_t) {
+                        .red = g_current_color->red,
+                        .grn = g_current_color->grn,
+                        .blu = g_current_color->blu,
+                    };
+                }
+                break;
+
+            case GLFW_KEY_X:
+                if(g_color_modify_visible) {
+                    g_current_color->red = g_copied_color.red;
+                    g_current_color->grn = g_copied_color.grn;
+                    g_current_color->blu = g_copied_color.blu;
+                }
+                break;
         }
     }
     else { 
@@ -557,13 +744,16 @@ void print_controls() {
     print_control_desc("MOUSE MID BUTTON + DRAG", "Drag grid.");
     print_control_desc("MOUSE SCROLL", "Zoom.");
     print_control_desc("HOLD MOUSE RIGHT then CONTROL + N", "Delete data.");
-    print_control_desc("MOUSE SCROLL + V", "Select color from palette.");
     print_control_desc("G", "Toggle grid background.");
     print_control_desc("E", "Toggle erase mode.");
     print_control_desc("D", "Decrease erase/draw size");
     print_control_desc("F", "Increase erase/draw size");
     print_control_desc("C", "Modify selected color.");
-    print_control_desc("CONTROL + S", "Save");
+    print_control_desc_sub("Z", "Copy selected color.");
+    print_control_desc_sub("X", "Paste selected color.");
+    print_control_desc_sub("1", "Dim selected color.");
+    print_control_desc_sub("2", "Brighten selected color.");
+    print_control_desc("MOUSE SCROLL + V", "Select color from palette.");
 
     printf("---------------------------------\n");
 
@@ -574,7 +764,7 @@ void init_colorpalette() {
     
     for(int i = 0; i < COLORPALETTE_MAX; i++) {
         
-        rainbow_palette(sin((float)i*0.08),
+        rainbow_palette(sin((float)i*0.07),
                 &g_colorpalette[i].red,
                 &g_colorpalette[i].grn,
                 &g_colorpalette[i].blu
@@ -582,46 +772,52 @@ void init_colorpalette() {
 
     }
 
+    g_current_color = &g_colorpalette[0];
+
 }
 
 
+int main() {
 
-int main(char** argv, int argc) {
+    TEX_MAX_WIDTH = 96;
+    TEX_MAX_HEIGHT = 96;
 
-    TEX_MAX_WIDTH = 64;
-    TEX_MAX_HEIGHT = 64;
-
-    const size_t texsize = sizeof *g_texdata * (TEX_MAX_WIDTH * TEX_MAX_HEIGHT);
+    size_t texdatasize = sizeof *g_texdata * (TEX_MAX_WIDTH * TEX_MAX_HEIGHT);
     g_texdata = NULL;
-    g_texdata = malloc(texsize);
+    g_texdata = malloc(texdatasize);
+
     if(!g_texdata) {
-        fprintf(stderr, "Failed to allocate memory for texture. size too big?\n");
+        perror("malloc");
+        fprintf(stderr, "Failed to allocate memory for texture data. size too big?\n");
         return 1;
     }
 
-    memset(g_texdata, 0, texsize);
 
     struct sandbox_t sbox;
-    if(!init_sandbox(&sbox, 900, 700, "[TexEdit]")) {
+    if(!init_sandbox(&sbox, 900, 700, "Texture Editor")) {
         return 1;
     }
 
     glfwSetWindowUserPointer(sbox.win, &sbox);
-
-    print_controls();
-    init_colorpalette();
-    
     g_mode = MODE_DRAW;
     g_color_modify_visible = 0;
     g_erase_size = 1;
     g_draw_size = 1;
-    g_grid_zoom = 2;
+    g_grid_zoom = 1;
     g_grid_x = sbox.center_col;
     g_grid_y = sbox.center_row;
     g_mouse_prev_col = 0;
     g_mouse_prev_row = 0;
     g_show_grid = 1;
     g_current_colorp_index = 0;
+    g_num_sliders = 0;
+    g_current_slider_index = -1;
+
+    print_controls();
+    init_colorpalette();
+    init_sliders();
+
+
 
     glfwSetKeyCallback(sbox.win, key_callback);
 
@@ -629,10 +825,11 @@ int main(char** argv, int argc) {
     sbox.render_mode = RENDERMODE_POLL_EVENTS;
 
     run_sandbox(&sbox, loop, NULL);
-    
+
     free(g_texdata);
     free_sandbox(&sbox);
 
+    printf("exit 0.\n");
     return 0;
 }
 
