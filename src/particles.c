@@ -7,18 +7,18 @@
 
 
 int init_psys(
-        struct sandbox_t* sbox,
+        struct sbp_t* sbox,
         struct psys_t* psys,
         size_t num_particles,
         
         void(*setup_callback)
-        (struct sandbox_t*, struct psys_t*, struct particle_t*),
+        (struct sbp_t*, struct psys_t*, struct particle_t*),
 
         void(*update_callback)
-        (struct sandbox_t*, struct psys_t*, struct particle_t*),
+        (struct sbp_t*, struct psys_t*, struct particle_t*),
         
         void(*death_callback)
-        (struct sandbox_t*, struct psys_t*, struct particle_t*),
+        (struct sbp_t*, struct psys_t*, struct particle_t*),
         
         void* userptr)
 {
@@ -51,7 +51,7 @@ int init_psys(
         perror("malloc");
     }
 
-    void(*pinit_callback)(struct sandbox_t*, struct psys_t*, struct particle_t*)
+    void(*pinit_callback)(struct sbp_t*, struct psys_t*, struct particle_t*)
         = ((setup_callback != NULL) ? setup_callback 
         : ((death_callback != NULL) ? death_callback : NULL));
 
@@ -110,7 +110,7 @@ void delete_psys(struct psys_t* psys) {
     psys->last_dead_index = 0;
 }
 
-void update_psys(struct sandbox_t* sbox, struct psys_t* psys) {
+void update_psys(struct sbp_t* sbox, struct psys_t* psys) {
     if(!psys) {
         return;
     }

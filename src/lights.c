@@ -5,7 +5,7 @@
 
 
 struct light_t* setup_light(
-        struct sandbox_t* sbox,
+        struct sbp_t* sbox,
         int req_index,
         float x, float y,
         float r,
@@ -53,7 +53,7 @@ error:
 }
 
 
-void update_light_allvars(struct sandbox_t* sbox, struct light_t* light) {
+void update_light_allvars(struct sbp_t* sbox, struct light_t* light) {
     update_light_pos(sbox, light);
     update_light_color(light);
     update_light_strength(light);
@@ -62,7 +62,7 @@ void update_light_allvars(struct sandbox_t* sbox, struct light_t* light) {
 }
 
 
-void update_light_pos(struct sandbox_t* sbox, struct light_t* light) {
+void update_light_pos(struct sbp_t* sbox, struct light_t* light) {
 
     float pos[2] = {
         /* X */ map(light->x, 0.0, sbox->max_col, -1.0,  1.0),

@@ -72,7 +72,7 @@ struct pixels_t {
     size_t num_maxpixels;
 };
 
-struct sandbox_t {
+struct sbp_t {
     GLFWwindow* win;
     int running;
 
@@ -114,7 +114,7 @@ struct sandbox_t {
     // it is also called when run_sandbox exits the loop
     // you can set the ID with 'rcbuf_setid(sanbox_t*, x, y, id)' 
     // zero is treated as 'air'
-    // and then the function 'raycast(sandbox_t*, start_x, start_y, end_x, end_y)'
+    // and then the function 'raycast(sbp_t*, start_x, start_y, end_x, end_y)'
     // will return the ID if it hit anything non zero.
     int* rcbuf;
     int rcbuf_avail;
@@ -127,10 +127,10 @@ struct sandbox_t {
 };
 
 
-int init_sandbox(struct sandbox_t* sbox, int width, int height, const char* window_name);
-void run_sandbox(struct sandbox_t* sbox,
-        void(*loop_callback)(struct sandbox_t* sbox, void*), void* userptr);
-void free_sandbox(struct sandbox_t* sbox);
+int init_sandbox(struct sbp_t* sbox, int width, int height, const char* window_name);
+void run_sandbox(struct sbp_t* sbox,
+        void(*loop_callback)(struct sbp_t* sbox, void*), void* userptr);
+void free_sandbox(struct sbp_t* sbox);
 
 // ---- UTILITY FUNCTIONS ----
 
@@ -139,8 +139,8 @@ float vdistance(float x0, float y0, float x1, float y1);
 float vdot(float x0, float y0,  float x1, float y1);
 float vlength(float x, float y);
 float vangle(float x0, float y0, float x1, float y1);
-size_t getindexp(struct sandbox_t* sbox, int x, int y);
-void show_cursor(struct sandbox_t* sbox, int mode);
+size_t getindexp(struct sbp_t* sbox, int x, int y);
+void show_cursor(struct sbp_t* sbox, int mode);
 
 
 //  ---- RAYCAST FUNCTIONS ----
@@ -148,11 +148,11 @@ void show_cursor(struct sandbox_t* sbox, int mode);
 #define RAYCAST_AIRID 0
 
 
-int allocate_rcbuf(struct sandbox_t* sbox);
-void free_rcbuf(struct sandbox_t* sbox);
+int allocate_rcbuf(struct sbp_t* sbox);
+void free_rcbuf(struct sbp_t* sbox);
 
-void rcbuf_setid(struct sandbox_t* sbox, int x, int y, int id);
-int  raycast(struct sandbox_t* sbox, 
+void rcbuf_setid(struct sbp_t* sbox, int x, int y, int id);
+int  raycast(struct sbp_t* sbox, 
         int start_x, int start_y,
         int end_x,  int end_y,
         int* hit_x, int* hit_y);
@@ -161,19 +161,19 @@ int  raycast(struct sandbox_t* sbox,
 
 // ---- DRAWING FUNCTIONS ----
 
-void setpixel(struct sandbox_t* sbox, 
+void setpixel(struct sbp_t* sbox, 
         float x, float y,
         float r, float g, float b);
 
-void fillcircle(struct sandbox_t* sbox, 
+void fillcircle(struct sbp_t* sbox, 
         float fx, float fy, float radius,
         float r, float g, float b);
 
-void setline(struct sandbox_t* sbox, 
+void setline(struct sbp_t* sbox, 
         int x0, int y0, int x1, int y1,
         float r, float g, float b);
 
-void setbox(struct sandbox_t* sbox,
+void setbox(struct sbp_t* sbox,
         float x, float y, float w, float h,
         float r, float g, float b);
 

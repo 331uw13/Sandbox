@@ -4,8 +4,10 @@
 #include <unistd.h>
 #include <string.h>
 #include <fcntl.h>
+#include <errno.h>
 
 #include "../../src/sandbox.h"
+#include "../../src/texture.h"
 
 static long int TEX_MAX_COLUMN;
 static long int TEX_MAX_ROW;
@@ -234,7 +236,10 @@ void get_texpixels_from_circle(
                 continue;
             }
 
-            callback(&g_texdata[tpindx]);
+            struct texpixel_t* tp = &g_texdata[tpindx];
+            tp->x = x;
+            tp->y = y;
+            callback(tp);
         }
     }
 }
@@ -787,13 +792,18 @@ void init_colorpalette() {
 
 /*
 
-   texture file structure:
+   --=# Texture file structure #=--
 
+   * the data type should be 'int'
 
-   first 4 bytes: texture width.
-   second 4 bytes: texture height.
+   first 16 bytes is information 
+   about the texture (in this order): 
+    - signature (660A FF01)
+    - texture max columns
+    - texture max rows
+    - number of pixels
 
-   1 segment contains (in order)
+   1 segment contains (in this order)
     - pixel x position
     - pixel y position
     - red value            rgb is from 0 to 255
@@ -803,39 +813,73 @@ void init_colorpalette() {
     these segments are next to each other until end of file
 
 
-    struct texpixel_t {
-        float red;
-        float grn;
-        float blu;
-        int x;
-        int y;
-        int active;
-    };
-
 */
+
+#define PRINT_ERRNO_FROMHERE\
+    fprintf(stderr, "%s: %s\n", __func__, strerror(errno))
 
 void write_texdata() {
    
-    int fd = open(g_texfilepath, O_WRONLY | O_APPEND);
-    if(fd == -1) {
-        perror("open");
+    int fd = open(g_texfilepath, O_TRUNC | O_WRONLY | O_APPEND);
+    if(fd < 0) {
+        PRINT_ERRNO_FROMHERE;
         return;
     }
 
     size_t texsize = (size_t)(TEX_MAX_COLUMN * TEX_MAX_ROW);    
-    int buf[SB_TEXTURE_SEGMENT_SIZE] = { 0 };
+    int buf[16] = { 0 };
+
+    // need to count active pixels first.
+    size_t texnum_pixels = 0;
+    for(size_t i = 0; i < texsize; i++) {
+        struct texpixel_t* tp = &g_texdata[i];
+        if(!tp->active) { continue; }
+        texnum_pixels++;
+    }
+
+    // write the information about the texture
+    buf[0] = SB_TEX_FILE_SIGNATURE;
+    buf[1] = TEX_MAX_COLUMN;
+    buf[2] = TEX_MAX_ROW;
+    buf[3] = texnum_pixels;
+    size_t bytes_written = write(fd, buf, sizeof(int) * SB_TEX_INFO_ELEMCOUNT);
+
+    // now write the data.
 
     for(size_t i = 0; i < texsize; i++) {
         struct texpixel_t* tp = &g_texdata[i];
         if(!tp->active) { continue; }
 
+        buf[0] = tp->x;
+        buf[1] = tp->y;
+        buf[2] = (int)(tp->red * 255);
+        buf[3] = (int)(tp->grn * 255);
+        buf[4] = (int)(tp->blu * 255);
 
+        bytes_written += write(fd, buf, sizeof *buf * SB_TEX_SEG_ELEMCOUNT);
     }
 
-
-
     close(fd);
-    printf("saved.\n");
+    printf("%li bytes written.\n", bytes_written);
+}
+
+int allocate_g_texdata() {
+    int result = 0;
+
+    size_t texdatasize = sizeof *g_texdata * (TEX_MAX_COLUMN * TEX_MAX_ROW);
+    g_texdata = NULL;
+    g_texdata = malloc(texdatasize);
+
+    if(!g_texdata) {
+        perror("malloc");
+        fprintf(stderr, "Failed to allocate memory for texture data. size too big?\n");
+        goto error;
+    }
+
+    result = 1;
+
+error:
+    return result;
 }
 
 
@@ -847,10 +891,120 @@ int init_from_existing_file() {
         goto error;
     }
 
+    int fd = open(g_texfilepath, O_RDONLY);
+
+    if(fd < 0) {
+        PRINT_ERRNO_FROMHERE;
+        goto error;
+    }
 
 
+    struct sb_texinfo_t texinfo;
+    if(!sb_read_texinfo(&texinfo, fd)) {
+        goto error_n_close;
+    }
 
+
+    printf( "signature: 0x%X\n"
+            "max columns: %i\n"
+            "max rows: %i\n"
+            "pixels: %i\n",
+            texinfo.sig,
+            texinfo.cols,
+            texinfo.rows,
+            texinfo.pixels);
+
+    if(texinfo.sig != SB_TEX_FILE_SIGNATURE) {
+        fprintf(stderr, "The file format is not correct.\n");
+        goto error_n_close;
+    }
+
+    TEX_MAX_COLUMN = texinfo.cols;
+    TEX_MAX_ROW = texinfo.rows;
+
+    if(!allocate_g_texdata()) {
+        goto error_n_close;
+    }
+
+    if(TEX_MAX_COLUMN > SB_TEX_COLUMN_LIMIT) {
+        fprintf(stderr, 
+                "Texture width is too large (%li)\n", TEX_MAX_COLUMN);
+        goto error_n_close;
+    }
+
+    if(TEX_MAX_ROW > SB_TEX_ROW_LIMIT) {
+        fprintf(stderr, 
+                "Texture height is too large (%li)\n", TEX_MAX_COLUMN);
+        goto error_n_close;
+    }
+
+    if(texinfo.pixels <= 0) {
+        fprintf(stderr,
+                "Number of pixels in the texture file is less or equal to zero\n");
+        goto error_n_close;
+    }
+
+    // allocate memory for the data and read it there.
+
+    const size_t rawtexdata_sizeb = 
+        (texinfo.pixels * SB_TEX_SEG_ELEMCOUNT) * sizeof(int);
+
+    int* rawtexdata = NULL;
+    rawtexdata = malloc(rawtexdata_sizeb);
+
+    if(!rawtexdata) {
+        PRINT_ERRNO_FROMHERE;
+        fprintf(stderr, "Failed to allocate memory for texture data buffer\n");
+        goto error_n_close;
+    }
+
+    memset(rawtexdata, 0, rawtexdata_sizeb);
+
+    if(read(fd, rawtexdata, rawtexdata_sizeb) < 0) {
+        PRINT_ERRNO_FROMHERE;
+        fprintf(stderr, "Read failed to memory from texture file\n");
+        
+        free(rawtexdata);
+        goto error_n_close;
+    }
+
+
+    // now it can parse the texture data
+    for(size_t i = 0; 
+            i < (size_t)texinfo.pixels * (SB_TEX_SEG_ELEMCOUNT);
+                i += (SB_TEX_SEG_ELEMCOUNT))
+    {
+        int x   = rawtexdata[i];
+        int y   = rawtexdata[i+1];
+        int red = rawtexdata[i+2];
+        int grn = rawtexdata[i+3];
+        int blu = rawtexdata[i+4];
+
+        printf("%i, %i, %i, %i, %i\n", x, y, red, grn, blu);
+
+        size_t index = (size_t)(y * TEX_MAX_COLUMN + x);
+        if(index >= (size_t)(TEX_MAX_COLUMN * TEX_MAX_ROW)) {
+            printf("%i failed\n", index);
+            continue;
+        }
+
+        struct texpixel_t* tp = &g_texdata[index];
+
+        tp->active = 1;
+        tp->x = x;
+        tp->y = y;
+        tp->red = (float)red / 255.0;
+        tp->grn = (float)grn / 255.0;
+        tp->blu = (float)blu / 255.0;
+
+    }
+
+    free(rawtexdata);
+
+error_n_close:
+    close(fd);
     result = 1;
+
 error:
     return result;
 }
@@ -863,8 +1017,24 @@ int init_new_file(int maxcol, int maxrow) {
         goto error;
     }
 
+    int mode = 
+          S_IRUSR /* user has read permissions */
+        | S_IWUSR /* user has write permissions */
+        | S_IRGRP /* group has read permissions */
+        | S_IROTH /* others have read permissions */
+        ;
+
+    if(creat(g_texfilepath, mode) < 0) {
+        PRINT_ERRNO_FROMHERE;
+        fprintf(stderr, "Failed to create new file.\n");
+    }
+
     TEX_MAX_COLUMN = maxcol;
     TEX_MAX_ROW = maxrow;
+
+    if(!allocate_g_texdata()) {
+        goto error;
+    }
 
     result = 1;
 
@@ -923,17 +1093,6 @@ int main(int argc, char** argv) {
     
         printf("\033[32m +> \033[0mEditing New file '%s' %ix%i\n",
                 g_texfilepath, cols, rows);
-    }
-
-
-    size_t texdatasize = sizeof *g_texdata * (TEX_MAX_COLUMN * TEX_MAX_ROW);
-    g_texdata = NULL;
-    g_texdata = malloc(texdatasize);
-
-    if(!g_texdata) {
-        perror("malloc");
-        fprintf(stderr, "Failed to allocate memory for texture data. size too big?\n");
-        return RET_FAILURE;
     }
 
 

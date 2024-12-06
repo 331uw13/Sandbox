@@ -5,8 +5,8 @@
 
 #include "sandbox.h"
 
-void run_sandbox(struct sandbox_t* sbox,
-        void(*loop_callback)(struct sandbox_t* sbox, void*), void* userptr) {
+void run_sandbox(struct sbp_t* sbox,
+        void(*loop_callback)(struct sbp_t* sbox, void*), void* userptr) {
     
 
 
@@ -103,7 +103,7 @@ void run_sandbox(struct sandbox_t* sbox,
 
 }
 
-void free_sandbox(struct sandbox_t* sbox) {
+void free_sandbox(struct sbp_t* sbox) {
     glDeleteVertexArrays(1, &sbox->effect.vao);
     glDeleteBuffers(1, &sbox->effect.vbo);
     glDeleteBuffers(1, &sbox->effect.ebo);
@@ -126,14 +126,14 @@ void free_sandbox(struct sandbox_t* sbox) {
 }
 
 static void scroll_callback(GLFWwindow* window, double xoffset, double yoffset) {
-    struct sandbox_t* sbox = (struct sandbox_t*) glfwGetWindowUserPointer(window);
+    struct sbp_t* sbox = (struct sbp_t*) glfwGetWindowUserPointer(window);
     if(sbox) {
         sbox->mouse_scroll = (int)yoffset;
     }
 }
 
 static void mouse_button_callback(GLFWwindow* window, int button, int action, int mods) {
-    struct sandbox_t* sbox = (struct sandbox_t*) glfwGetWindowUserPointer(window);
+    struct sbp_t* sbox = (struct sbp_t*) glfwGetWindowUserPointer(window);
     if(sbox && (action == GLFW_PRESS)) {
         switch(button) {
             case GLFW_MOUSE_BUTTON_LEFT:
@@ -149,7 +149,7 @@ static void mouse_button_callback(GLFWwindow* window, int button, int action, in
     }
 }
 
-static int _compile_shaderprog(struct sandbox_t* sbox, 
+static int _compile_shaderprog(struct sbp_t* sbox, 
         const char* name_to_stdout,
         const char* vert_src, const char* frag_src) 
 {
@@ -165,9 +165,9 @@ static int _compile_shaderprog(struct sandbox_t* sbox,
     return result;
 }
 
-int init_sandbox(struct sandbox_t* sbox, int width, int height, const char* window_name) {
+int init_sandbox(struct sbp_t* sbox, int width, int height, const char* window_name) {
     int result = 0;
-    //struct sandbox_t* sbox = NULL;
+    //struct sbp_t* sbox = NULL;
     //sbox = malloc(sizeof *sbox);
 
 
@@ -418,7 +418,7 @@ float vangle(float x0, float y0, float x1, float y1) {
     return (atan2(dely, delx)*180.0)/_PI;
 }
 
-size_t getindexp(struct sandbox_t* sbox, int x, int y) {
+size_t getindexp(struct sbp_t* sbox, int x, int y) {
     if(x < 0) { x = 0; }
     if(y < 0) { y = 0; }
 
@@ -432,14 +432,14 @@ size_t getindexp(struct sandbox_t* sbox, int x, int y) {
     return index;
 }
 
-void show_cursor(struct sandbox_t* sbox, int mode) {
+void show_cursor(struct sbp_t* sbox, int mode) {
     glfwSetInputMode(sbox->win, GLFW_CURSOR, (mode) ? GLFW_CURSOR_NORMAL : GLFW_CURSOR_HIDDEN);
 }
 
 
 // RAYCAST FUNCTIONS
 
-int allocate_rcbuf(struct sandbox_t* sbox) {
+int allocate_rcbuf(struct sbp_t* sbox) {
     int res = 0;
 
     if(sbox->rcbuf != NULL) {
@@ -465,20 +465,20 @@ error:
     return res;
 }
 
-void free_rcbuf(struct sandbox_t* sbox) {
+void free_rcbuf(struct sbp_t* sbox) {
     if(sbox->rcbuf) {
         free(sbox->rcbuf);
     }
     sbox->rcbuf_avail = 0;
 }
 
-void rcbuf_setid(struct sandbox_t* sbox, int x, int y, int id) {
+void rcbuf_setid(struct sbp_t* sbox, int x, int y, int id) {
     if(sbox->rcbuf && sbox->rcbuf_avail) {
         sbox->rcbuf[getindexp(sbox, x, y)] = id;
     }
 }
 
-int raycast(struct sandbox_t* sbox, 
+int raycast(struct sbp_t* sbox, 
         int start_x, int start_y,
         int end_x,  int end_y,
         int* hit_x, int* hit_y)
@@ -542,7 +542,7 @@ int raycast(struct sandbox_t* sbox,
 
 // "DRAWING" FUNCTIONS
 
-void setpixel(struct sandbox_t* sbox, float x, float y,
+void setpixel(struct sbp_t* sbox, float x, float y,
         float r, float g, float b)
 {
     x = floorf(x);
@@ -572,7 +572,7 @@ void setpixel(struct sandbox_t* sbox, float x, float y,
     }
 }
 
-void fillcircle(struct sandbox_t* sbox, 
+void fillcircle(struct sbp_t* sbox, 
         float fx, float fy, float radius,
         float r, float g, float b)
 {
@@ -603,7 +603,7 @@ void fillcircle(struct sandbox_t* sbox,
     }
 }
 
-void setline(struct sandbox_t* sbox, 
+void setline(struct sbp_t* sbox, 
         int x0, int y0, int x1, int y1,
         float r, float g, float b)
 {
@@ -648,7 +648,7 @@ void setline(struct sandbox_t* sbox,
     }
 }
 
-void setbox(struct sandbox_t* sbox,
+void setbox(struct sbp_t* sbox,
         float x, float y, float w, float h,
         float r, float g, float b)
 {

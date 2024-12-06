@@ -4,7 +4,7 @@
 #include <stddef.h>
 
 
-struct sandbox_t;
+struct sbp_t;
 
 
 struct particle_t {
@@ -53,7 +53,7 @@ struct psys_t {
 
     // called when particle needs updating for frame.
     void(*update_callback)(
-            struct sandbox_t*,
+            struct sbp_t*,
             struct psys_t*,
             struct particle_t*
             );
@@ -61,7 +61,7 @@ struct psys_t {
     // called when particle has died so user can "respawn" it.
     // can be null
     void(*death_callback)(
-            struct sandbox_t*,
+            struct sbp_t*,
             struct psys_t*,
             struct particle_t*
             );
@@ -72,11 +72,12 @@ struct psys_t {
     int ready;
 };
 
+// RENAME
 #define PSYSNOSETUP NULL
 #define PSYSNORESPAWN NULL
 
 int init_psys(
-        struct sandbox_t* sbox,
+        struct sbp_t* sbox,
         struct psys_t* psys,
         size_t num_particles,
 
@@ -85,16 +86,16 @@ int init_psys(
         // then 'death_callback' is required,
         //      it is called when initializing particles.
         void(*setup_callback)
-        (struct sandbox_t*, struct psys_t*, struct particle_t*),
+        (struct sbp_t*, struct psys_t*, struct particle_t*),
         
         // called every frame ifif particle is alive
         void(*update_callback)
-        (struct sandbox_t*, struct psys_t*, struct particle_t*),
+        (struct sbp_t*, struct psys_t*, struct particle_t*),
         
         // called when particle dies
         // can be NULL. read above.
         void(*death_callback) 
-        (struct sandbox_t*, struct psys_t*, struct particle_t*),
+        (struct sbp_t*, struct psys_t*, struct particle_t*),
         
 
         void*  userptr
@@ -102,7 +103,7 @@ int init_psys(
 
 void delete_psys(struct psys_t* psys);
 
-void update_psys(struct sandbox_t* sbox, struct psys_t* psys);
+void update_psys(struct sbp_t* sbox, struct psys_t* psys);
 void revive_psys(struct psys_t* psys);
 
 
