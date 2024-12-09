@@ -4,7 +4,7 @@
 #include "sandbox.h"
 
 
-struct light_t* setup_light(
+struct light_t* sb_init_light(
         struct sbp_t* sbox,
         int req_index,
         float x, float y,
@@ -46,23 +46,23 @@ struct light_t* setup_light(
 
     glUniform1i(sbox->effect.unilocs[EFFECT_UNILOC_INUMLIGHTS], sbox->num_lights);
 
-    update_light_allvars(sbox, ptr);
+    sb_update_light_allvars(sbox, ptr);
 
 error:
     return ptr;
 }
 
 
-void update_light_allvars(struct sbp_t* sbox, struct light_t* light) {
-    update_light_pos(sbox, light);
-    update_light_color(light);
-    update_light_strength(light);
-    update_light_radius(light);
-    update_light_effect(light);
+void sb_update_light_allvars(struct sbp_t* sbox, struct light_t* light) {
+    sb_update_light_pos(sbox, light);
+    sb_update_light_color(light);
+    sb_update_light_strength(light);
+    sb_update_light_radius(light);
+    sb_update_light_effect(light);
 }
 
 
-void update_light_pos(struct sbp_t* sbox, struct light_t* light) {
+void sb_update_light_pos(struct sbp_t* sbox, struct light_t* light) {
 
     float pos[2] = {
         /* X */ map(light->x, 0.0, sbox->max_col, -1.0,  1.0),
@@ -74,26 +74,26 @@ void update_light_pos(struct sbp_t* sbox, struct light_t* light) {
     glBufferSubData(GL_UNIFORM_BUFFER, offset, size, pos);
 }
 
-void update_light_color(struct light_t* light) {
+void sb_update_light_color(struct light_t* light) {
     size_t offset = light->index * EFFECTSHADER_LIGHT_T_SIZEB + 16;
     size_t size = sizeof(float) * 3;
     float color[3] = { light->r, light->g, light->b };
     glBufferSubData(GL_UNIFORM_BUFFER, offset, size, color);
 }
 
-void update_light_strength(struct light_t* light) {
+void sb_update_light_strength(struct light_t* light) {
     size_t offset = light->index * EFFECTSHADER_LIGHT_T_SIZEB + 32;
     size_t size = sizeof(float);
     glBufferSubData(GL_UNIFORM_BUFFER, offset, size, &light->strength);
 }
 
-void update_light_radius(struct light_t* light) {
+void sb_update_light_radius(struct light_t* light) {
     size_t offset = light->index * EFFECTSHADER_LIGHT_T_SIZEB + 32+4;
     size_t size = sizeof(float);
     glBufferSubData(GL_UNIFORM_BUFFER, offset, size, &light->radius);
 }
 
-void update_light_effect(struct light_t* light) {
+void sb_update_light_effect(struct light_t* light) {
     size_t offset = light->index * EFFECTSHADER_LIGHT_T_SIZEB + 32+4*2;
     size_t size = sizeof(float);
     glBufferSubData(GL_UNIFORM_BUFFER, offset, size, &light->effect);

@@ -9,7 +9,7 @@
 static int mscroll = 0;
 
 
-void loop(struct sandbox_t* sbox, void* ptr) {
+void loop(struct sbp_t* sbox, void* ptr) {
     mscroll += sbox->mouse_scroll;
     float mx = sbox->mouse_x;
     float my = sbox->mouse_y;
@@ -40,7 +40,7 @@ void loop(struct sandbox_t* sbox, void* ptr) {
 
 int main() {
 
-    struct sandbox_t sbox;
+    struct sbp_t sbox;
     if(!init_sandbox(&sbox, 700, 600, "[Sandbox]")) {
         return 1;
     }

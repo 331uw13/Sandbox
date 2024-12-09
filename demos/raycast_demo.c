@@ -8,7 +8,7 @@
 static int seed = 0;
 
 
-void draw_raycast_buf(struct sandbox_t* sbox) {
+void draw_raycast_buf(struct sbp_t* sbox) {
     for(int y = 0; y < sbox->max_row; y++) {
         for(int x = 0; x < sbox->max_col; x++) {
             if(sbox->rcbuf[getindexp(sbox, x, y)]) {
@@ -24,9 +24,9 @@ static float pl_yf;
 
 #define SPEED 80
 
-void loop(struct sandbox_t* sbox, void* ptr) {
-    float mx = sbox->mouse_x;
-    float my = sbox->mouse_y;
+void loop(struct sbp_t* sbox, void* ptr) {
+    float mx = sbox->mouse_col;
+    float my = sbox->mouse_row;
 
     draw_raycast_buf(sbox);
 
@@ -35,7 +35,7 @@ void loop(struct sandbox_t* sbox, void* ptr) {
 
     int hit_x = 0;
     int hit_y = 0;
-    int rcid = raycast(sbox,  pl_x, pl_y, mx, my,  &hit_x, &hit_y);
+    int rcid = sb_raycast(sbox,  pl_x, pl_y, mx, my,  &hit_x, &hit_y);
 
 
     if(rcid) {
@@ -63,19 +63,19 @@ void loop(struct sandbox_t* sbox, void* ptr) {
     setpixel(sbox, pl_x, pl_y,  1.0, 1.0, 1.0);
 }
 
-void set_boxtomap(struct sandbox_t* sbox, int xpos, int ypos, int width, int height) {
+void set_boxtomap(struct sbp_t* sbox, int xpos, int ypos, int width, int height) {
     
     for(int y = ypos; y < (ypos+height); y++) {
         for(int x = xpos; x < (xpos+width); x++) {
-            rcbuf_setid(sbox, x, y, 1);
+            sb_rcbuf_setid(sbox, x, y, 1);
         }
     }
 
 }
 
-void init_map(struct sandbox_t* sbox) {
+void init_map(struct sbp_t* sbox) {
     
-    allocate_rcbuf(sbox);
+    sb_init_rcbuf(sbox);
     
     set_boxtomap(sbox, 30, 30, 20, 30);
     set_boxtomap(sbox, 120, 50, 50, 30);
@@ -89,7 +89,7 @@ void init_map(struct sandbox_t* sbox) {
 
 int main() {
 
-    struct sandbox_t sbox;
+    struct sbp_t sbox;
     if(!init_sandbox(&sbox, 700, 600, "[Sandbox]")) {
         return 1;
     }
@@ -100,7 +100,6 @@ int main() {
     seed = time(0);
     init_map(&sbox);
         
-    
     run_sandbox(&sbox, loop, NULL);
     free_sandbox(&sbox);
 

@@ -5,6 +5,7 @@
 #include <string.h>
 #include <fcntl.h>
 #include <errno.h>
+#include <time.h>
 
 #include "../../src/sandbox.h"
 #include "../../src/texture.h"
@@ -12,7 +13,7 @@
 static long int TEX_MAX_COLUMN;
 static long int TEX_MAX_ROW;
 
-#define COLORPALETTE_MAX 20
+#define COLORPALETTE_MAX 25
 #define COLORPALETTE_BOX 6
 
 // x position where cursor is detected to be on color palette
@@ -398,7 +399,7 @@ void loop(struct sbp_t* sbox, void* ptr) {
 
     // handle color dim/brighten here because the keys must be able to be held down
     // thats not possible in key_callback
-    // multiply with frame delta time so its same speed not depend on processor or the this program.
+    // multiply with frame delta time so its same speed not depend on how fast this program runs.
     if(g_color_modify_visible) {
         const float dimdtmult = 0.4;
         if(glfwGetKey(sbox->win, GLFW_KEY_1) == GLFW_PRESS) {
@@ -882,6 +883,7 @@ error:
     return result;
 }
 
+#define HEXRGB(r, g, b) (((r << 16)) | ((g << 8)) | (b))
 
 int init_from_existing_file() {
     int result = 0;
@@ -968,23 +970,33 @@ int init_from_existing_file() {
         goto error_n_close;
     }
 
+    struct timespec ts;
+    clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &ts);
+    size_t start_ns = ts.tv_nsec;
 
     // now it can parse the texture data
+    // and get information about the colors being used.
+    // add them to colorpalette
+    
+    // store colors temporary in hexadecimal
+    // makes it easier to compare them
+    unsigned int hex_palette[COLORPALETTE_MAX];
+    size_t num_colors = 0;
+    int informed_toomanycolors = 0;
+
     for(size_t i = 0; 
             i < (size_t)texinfo.pixels * (SB_TEX_SEG_ELEMCOUNT);
                 i += (SB_TEX_SEG_ELEMCOUNT))
     {
         int x   = rawtexdata[i];
         int y   = rawtexdata[i+1];
-        int red = rawtexdata[i+2];
-        int grn = rawtexdata[i+3];
-        int blu = rawtexdata[i+4];
-
-        printf("%i, %i, %i, %i, %i\n", x, y, red, grn, blu);
+        int red255 = rawtexdata[i+2];
+        int grn255 = rawtexdata[i+3];
+        int blu255 = rawtexdata[i+4];
 
         size_t index = (size_t)(y * TEX_MAX_COLUMN + x);
         if(index >= (size_t)(TEX_MAX_COLUMN * TEX_MAX_ROW)) {
-            printf("%i failed\n", index);
+            printf("%s: invalid pixel index! corrupted data? :/\n");
             continue;
         }
 
@@ -993,17 +1005,61 @@ int init_from_existing_file() {
         tp->active = 1;
         tp->x = x;
         tp->y = y;
-        tp->red = (float)red / 255.0;
-        tp->grn = (float)grn / 255.0;
-        tp->blu = (float)blu / 255.0;
+        tp->red = (float)red255 / 255.0;
+        tp->grn = (float)grn255 / 255.0;
+        tp->blu = (float)blu255 / 255.0;
 
+
+        if(num_colors < COLORPALETTE_MAX) {
+            unsigned int hex = HEXRGB(red255, grn255, blu255);
+            int hexcolorfound = 0;
+
+            // check first if the color exists in the array before adding it.
+            for(size_t k = 0; k < num_colors; k++) {
+                if(hex_palette[k] == hex) {
+                    hexcolorfound = 1;
+                    break;
+                }
+            }
+
+            if(!hexcolorfound) {
+                hex_palette[num_colors] = hex;
+                num_colors++;
+            }
+
+        }
+        else if(!informed_toomanycolors) {
+            fprintf(stderr, "\033[33mWarning: oops. a few too many colors to add into color palette\033[0m\n");
+            informed_toomanycolors = 1;
+        }
     }
 
     free(rawtexdata);
 
+
+    for(size_t i = 0; i < num_colors; i++) {
+        printf("0x%x\n", hex_palette[i]);
+
+        float redf = ((float)((hex_palette[i] >> 16) & 0xFF)) / 255.0;
+        float grnf = ((float)((hex_palette[i] >> 8)  & 0xFF)) / 255.0;
+        float bluf = ((float)((hex_palette[i])       & 0xFF)) / 255.0;
+
+        g_colorpalette[i].red = redf;
+        g_colorpalette[i].grn = grnf;
+        g_colorpalette[i].blu = bluf;
+    }
+
+
 error_n_close:
     close(fd);
     result = 1;
+    
+
+    clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &ts);
+    size_t end_ns = ts.tv_nsec;
+
+    printf("\033[34m-=> Parsed texture data\n    in %li nanoseconds\033[0m\n", end_ns - start_ns);
+
 
 error:
     return result;
@@ -1047,6 +1103,7 @@ error:
 
 int main(int argc, char** argv) {
 
+    
     if((argc <= 1) || (argc == 3) || (argc > 4)) {
         printf("\nInvalid number of arguments\n");
         print_usage(argv[0]);
@@ -1093,6 +1150,8 @@ int main(int argc, char** argv) {
     
         printf("\033[32m +> \033[0mEditing New file '%s' %ix%i\n",
                 g_texfilepath, cols, rows);
+    
+        init_colorpalette();
     }
 
 
@@ -1117,7 +1176,6 @@ int main(int argc, char** argv) {
     g_current_slider_index = -1;
 
     print_controls();
-    init_colorpalette();
     init_sliders();
 
 

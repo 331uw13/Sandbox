@@ -6,7 +6,7 @@
 
 
 
-int init_psys(
+int sb_init_psys(
         struct sbp_t* sbox,
         struct psys_t* psys,
         size_t num_particles,
@@ -95,7 +95,7 @@ error:
     return res;
 }
 
-void delete_psys(struct psys_t* psys) {
+void sb_delete_psys(struct psys_t* psys) {
     if(!psys) {
         return;
     }
@@ -110,7 +110,7 @@ void delete_psys(struct psys_t* psys) {
     psys->last_dead_index = 0;
 }
 
-void update_psys(struct sbp_t* sbox, struct psys_t* psys) {
+void sb_update_psys(struct sbp_t* sbox, struct psys_t* psys) {
     if(!psys) {
         return;
     }
@@ -148,7 +148,7 @@ void update_psys(struct sbp_t* sbox, struct psys_t* psys) {
     psys->alldead = alldead;
 }
 
-void revive_psys(struct psys_t* psys) {
+void sb_revive_psys(struct psys_t* psys) {
     if(psys->ready) {
         for(size_t i = 0; i < psys->num_particles; i++) {
             psys->particles[i].alive = 1;

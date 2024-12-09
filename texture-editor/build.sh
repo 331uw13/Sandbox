@@ -22,7 +22,7 @@ if gcc $files $compiler_flag \
     echo -en "\033[0m"
 
     if [[ $1 == "r" ]]; then
-        ./$name
+        ./$name asd.tex
     fi
 
 fi

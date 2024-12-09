@@ -116,7 +116,7 @@ void free_sandbox(struct sbp_t* sbox) {
     ewglu_delete_program(sbox->effect.shader);
     ewglu_delete_texture(sbox->effect.tex);
     
-    free_rcbuf(sbox);
+    sb_free_rcbuf(sbox);
 
     if(sbox->win) {
         glfwDestroyWindow(sbox->win);
@@ -390,7 +390,7 @@ error:
 
 // UTILITY FUNCTIONS
 
-void rainbow_palette(float t, float* r, float* g, float* b) {
+void sb_rainbow_palette(float t, float* r, float* g, float* b) {
     // for more information about this check out:
     // https://iquilezles.org/articles/palettes/
     *r = 0.5+0.5 * cos(_2PI * t);
@@ -418,7 +418,7 @@ float vangle(float x0, float y0, float x1, float y1) {
     return (atan2(dely, delx)*180.0)/_PI;
 }
 
-size_t getindexp(struct sbp_t* sbox, int x, int y) {
+size_t sb_getindexp(struct sbp_t* sbox, int x, int y) {
     if(x < 0) { x = 0; }
     if(y < 0) { y = 0; }
 
@@ -432,14 +432,14 @@ size_t getindexp(struct sbp_t* sbox, int x, int y) {
     return index;
 }
 
-void show_cursor(struct sbp_t* sbox, int mode) {
+void sb_show_cursor(struct sbp_t* sbox, int mode) {
     glfwSetInputMode(sbox->win, GLFW_CURSOR, (mode) ? GLFW_CURSOR_NORMAL : GLFW_CURSOR_HIDDEN);
 }
 
 
 // RAYCAST FUNCTIONS
 
-int allocate_rcbuf(struct sbp_t* sbox) {
+int sb_init_rcbuf(struct sbp_t* sbox) {
     int res = 0;
 
     if(sbox->rcbuf != NULL) {
@@ -465,20 +465,20 @@ error:
     return res;
 }
 
-void free_rcbuf(struct sbp_t* sbox) {
+void sb_free_rcbuf(struct sbp_t* sbox) {
     if(sbox->rcbuf) {
         free(sbox->rcbuf);
     }
     sbox->rcbuf_avail = 0;
 }
 
-void rcbuf_setid(struct sbp_t* sbox, int x, int y, int id) {
+void sb_rcbuf_setid(struct sbp_t* sbox, int x, int y, int id) {
     if(sbox->rcbuf && sbox->rcbuf_avail) {
-        sbox->rcbuf[getindexp(sbox, x, y)] = id;
+        sbox->rcbuf[sb_getindexp(sbox, x, y)] = id;
     }
 }
 
-int raycast(struct sbp_t* sbox, 
+int sb_raycast(struct sbp_t* sbox, 
         int start_x, int start_y,
         int end_x,  int end_y,
         int* hit_x, int* hit_y)
@@ -511,7 +511,7 @@ int raycast(struct sbp_t* sbox,
 
     for(int i = 0; i < longest; i++) {
 
-        if((id = sbox->rcbuf[getindexp(sbox, start_x, start_y)])
+        if((id = sbox->rcbuf[sb_getindexp(sbox, start_x, start_y)])
                 != RAYCAST_AIRID) {
 
             if(hit_x) {
@@ -665,3 +665,25 @@ void setbox(struct sbp_t* sbox,
 
 }
 
+void settex(struct sbp_t* sbox, 
+        float x, float y,
+        struct texture_t* tex)
+{
+
+    if(!tex) {
+        return;
+    }
+
+    if(!tex->data) {
+        return;
+    }
+
+    for(size_t i = 0; i < tex->num_pixels; i++) {
+        struct texpx_t* tp = &tex->data[i];
+
+        setpixel(sbox, x+tp->x, y+tp->y, tp->red, tp->grn, tp->blu);
+
+    }
+
+
+}

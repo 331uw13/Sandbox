@@ -31,7 +31,7 @@ struct sbp_t;
 // NULL is returned if 'req_index' is bigger or equal to MAX_LIGHTS
 // if 'req_index' is less than zero it is same as passing 'sbox->num_lights'
 // note if sbox->num_lights has reached the max user has to specify 'req_index'
-struct light_t* setup_light(
+struct light_t* sb_init_light(
         struct sbp_t* sbox,
         int req_index,
         float x, float y,
@@ -44,13 +44,13 @@ struct light_t* setup_light(
         );
 
 // update everything for the light
-void update_light_allvars(struct sbp_t* sbox, struct light_t* light);
+void sb_update_light_allvars(struct sbp_t* sbox, struct light_t* light);
 
-void update_light_pos(struct sbp_t* sbox, struct light_t* light);
-void update_light_color(struct light_t* light);
-void update_light_strength(struct light_t* light);
-void update_light_radius(struct light_t* light);
-void update_light_effect(struct light_t* light);
+void sb_update_light_pos(struct sbp_t* sbox, struct light_t* light);
+void sb_update_light_color(struct light_t* light);
+void sb_update_light_strength(struct light_t* light);
+void sb_update_light_radius(struct light_t* light);
+void sb_update_light_effect(struct light_t* light);
 
 
 #endif

@@ -76,7 +76,7 @@ struct psys_t {
 #define PSYSNOSETUP NULL
 #define PSYSNORESPAWN NULL
 
-int init_psys(
+int sb_init_psys(
         struct sbp_t* sbox,
         struct psys_t* psys,
         size_t num_particles,
@@ -101,10 +101,10 @@ int init_psys(
         void*  userptr
         );
 
-void delete_psys(struct psys_t* psys);
+void sb_delete_psys(struct psys_t* psys);
 
-void update_psys(struct sbp_t* sbox, struct psys_t* psys);
-void revive_psys(struct psys_t* psys);
+void sb_update_psys(struct sbp_t* sbox, struct psys_t* psys);
+void sb_revive_psys(struct psys_t* psys);
 
 
 #endif //PARTICLES_H

@@ -14,31 +14,29 @@ static struct light_t*  mylight_B;
 static struct light_t*  g_light_selected;
 
 
-void change_light_strength(struct sandbox_t* sbox, struct light_t* light) {
+void change_light_strength(struct sbp_t* sbox, struct light_t* light) {
     if(sbox->mouse_scroll < 0) {
         light->strength -= 0.1;
     }
     else if(sbox->mouse_scroll > 0) {
         light->strength += 0.1;
     }
-    update_light_strength(light);
-
-
+    sb_update_light_strength(light);
 }
 
-void loop(struct sandbox_t* sbox, void* ptr) {
+void loop(struct sbp_t* sbox, void* ptr) {
 
 
-    rainbow_palette(sin(sbox->time*0.5), &mylight_A->r, &mylight_A->g, &mylight_A->b);
-    update_light_color(mylight_A);
+    sb_rainbow_palette(sin(sbox->time*0.5), &mylight_A->r, &mylight_A->g, &mylight_A->b);
+    sb_update_light_color(mylight_A);
     
-    update_psys(sbox, &psystem);
+    sb_update_psys(sbox, &psystem);
 
     if(glfwGetMouseButton(sbox->win, GLFW_MOUSE_BUTTON_LEFT)) {
         g_light_selected->x = sbox->mouse_col;
         g_light_selected->y = sbox->mouse_row;
 
-        update_light_pos(sbox, g_light_selected);
+        sb_update_light_pos(sbox, g_light_selected);
     }
 
     if(sbox->mouse_scroll != 0) {
@@ -50,20 +48,20 @@ void loop(struct sandbox_t* sbox, void* ptr) {
             g_light_selected->strength += 0.1;
         }
 
-        update_light_strength(g_light_selected);
+        sb_update_light_strength(g_light_selected);
     }
 
     if(glfwGetKey(sbox->win, GLFW_KEY_UP) == GLFW_PRESS) {
         g_light_selected->radius += 0.2;
-        update_light_radius(g_light_selected);
+        sb_update_light_radius(g_light_selected);
     }
     else if(glfwGetKey(sbox->win, GLFW_KEY_DOWN) == GLFW_PRESS) {
         g_light_selected->radius -= 0.2;
-        update_light_radius(g_light_selected);
+        sb_update_light_radius(g_light_selected);
     }
 }
 
-void psystem_pupdate_callback(struct sandbox_t* sbox, struct psys_t* psys, struct particle_t* p) {
+void psystem_pupdate_callback(struct sbp_t* sbox, struct psys_t* psys, struct particle_t* p) {
     p->x += p->vel_x * sbox->dt;
     p->y += p->vel_y * sbox->dt;
 
@@ -75,7 +73,7 @@ void psystem_pupdate_callback(struct sandbox_t* sbox, struct psys_t* psys, struc
     fillcircle(sbox, p->x, p->y, rad,  p->r, p->g, p->b);
 }
 
-void psystem_pdeath_callback(struct sandbox_t* sbox, struct psys_t* psys, struct particle_t* p) {
+void psystem_pdeath_callback(struct sbp_t* sbox, struct psys_t* psys, struct particle_t* p) {
     p->x = sbox->center_col + randomf(&seed, -10.0, 10.0);
     p->y = sbox->center_row + 30;
    
@@ -110,18 +108,18 @@ static void key_callback(GLFWwindow* window, int key, int scancode, int action, 
     }
 }
 
-void setup(struct sandbox_t* sbox) {
+void setup(struct sbp_t* sbox) {
     seed = time(0);
     mylight_A = NULL;
     mylight_B = NULL;
 
     glfwSetKeyCallback(sbox->win, key_callback);
 
-    init_psys(sbox, &psystem, 100,
+    sb_init_psys(sbox, &psystem, 100,
             PSYSNOSETUP, psystem_pupdate_callback, psystem_pdeath_callback,
             NULL);
 
-    mylight_A = setup_light(sbox, 
+    mylight_A = sb_init_light(sbox, 
             0, 
             sbox->center_col - 30, /* x */
             sbox->center_row,      /* y */
@@ -133,7 +131,7 @@ void setup(struct sandbox_t* sbox) {
             0.4    /* effect */
             );
 
-    mylight_B = setup_light(sbox, 
+    mylight_B = sb_init_light(sbox, 
             1, 
             sbox->center_col + 30, /* x */
             sbox->center_row + 20, /* y */
@@ -159,7 +157,7 @@ void setup(struct sandbox_t* sbox) {
 
 int main() {
 
-    struct sandbox_t sbox;
+    struct sbp_t sbox;
     if(!init_sandbox(&sbox, 700, 600, "[Sandbox]")) {
         return 1;
     }
@@ -168,7 +166,7 @@ int main() {
 
     run_sandbox(&sbox, loop, NULL);
 
-    delete_psys(&psystem);
+    sb_delete_psys(&psystem);
     free_sandbox(&sbox);
 
     return 0;

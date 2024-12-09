@@ -12,13 +12,13 @@ static struct psys_t loop_psys;
 static struct psys_t rain_psys;
 
 
-void loop(struct sandbox_t* sbox, void* ptr) {
+void loop(struct sbp_t* sbox, void* ptr) {
 
-    update_psys(sbox, &rain_psys);
-    update_psys(sbox, &loop_psys);
+    sb_update_psys(sbox, &rain_psys);
+    sb_update_psys(sbox, &loop_psys);
 
 
-    fillcircle(sbox, sbox->mouse_x, sbox->mouse_y, 6.0, 1.0, 0.3,0.3);
+    sb_fillcircle(sbox, sbox->mouse_col, sbox->mouse_row, 6.0, 1.0, 0.3,0.3);
 }
 
 #define RAD 50
@@ -28,7 +28,7 @@ void loop(struct sandbox_t* sbox, void* ptr) {
 
 // ------ colorful worm loop particle system
 
-void loop_psys_pupdate(struct sandbox_t* sbox, struct psys_t* psys, struct particle_t* p) {
+void loop_psys_pupdate(struct sbp_t* sbox, struct psys_t* psys, struct particle_t* p) {
 
     p->x += p->vel_x;
     p->y += p->vel_y;
@@ -41,11 +41,11 @@ void loop_psys_pupdate(struct sandbox_t* sbox, struct psys_t* psys, struct parti
     p->b = lerp(p->lifetime, p->init_blu, 0.0);
 
 
-    fillcircle(sbox, p->x, p->y, lerp(p->lifetime, 4.0, 0.0), p->r, p->g, p->b);
+    sb_fillcircle(sbox, p->x, p->y, lerp(p->lifetime, 4.0, 0.0), p->r, p->g, p->b);
 }
 
 
-void loop_psys_pdeath(struct sandbox_t* sbox, struct psys_t* psys, struct particle_t* p) {
+void loop_psys_pdeath(struct sbp_t* sbox, struct psys_t* psys, struct particle_t* p) {
     
     p->x = sbox->center_col + CX(sbox->time + 2.0*cos(sbox->time));
     p->y = sbox->center_row + CY(sbox->time);
@@ -58,7 +58,7 @@ void loop_psys_pdeath(struct sandbox_t* sbox, struct psys_t* psys, struct partic
     p->acc_x = 0.0;
     p->acc_y = 0.008;
 
-    rainbow_palette(sin(sbox->time), &p->r, &p->g, &p->b);
+    sb_rainbow_palette(sin(sbox->time), &p->r, &p->g, &p->b);
 
     p->init_red = p->r;
     p->init_grn = p->g;
@@ -72,7 +72,7 @@ void loop_psys_pdeath(struct sandbox_t* sbox, struct psys_t* psys, struct partic
 
 // ------- rain particle system
 
-void rain_particle_respawn(struct sandbox_t* sbox, struct particle_t* p) {
+void rain_particle_respawn(struct sbp_t* sbox, struct particle_t* p) {
     p->x = randomi(&seed, 0, sbox->max_col);
     p->y = 0;
 
@@ -88,28 +88,28 @@ void rain_particle_respawn(struct sandbox_t* sbox, struct particle_t* p) {
     p->lifetime = 0.0;
 }
 
-void rain_psys_pupdate(struct sandbox_t* sbox, struct psys_t* psys, struct particle_t* p) {
+void rain_psys_pupdate(struct sbp_t* sbox, struct psys_t* psys, struct particle_t* p) {
     p->y += p->vel_y;
     p->x += p->vel_x;
     if(p->y > sbox->max_row) {
         rain_particle_respawn(sbox, p);
     }
 
-    setpixel(sbox, p->x, p->y, p->r, p->g, p->b);
+    sb_setpixel(sbox, p->x, p->y, p->r, p->g, p->b);
 }
 
 
-void rain_psys_pdeath(struct sandbox_t* sbox, struct psys_t* psys, struct particle_t* p) {
+void rain_psys_pdeath(struct sbp_t* sbox, struct psys_t* psys, struct particle_t* p) {
     rain_particle_respawn(sbox, p);
 }
 
 
-void setup(struct sandbox_t* sbox) {
+void setup(struct sbp_t* sbox) {
 
-    init_psys(sbox, &loop_psys, 80,
+    sb_init_psys(sbox, &loop_psys, 80,
             PSYSNOSETUP, loop_psys_pupdate, loop_psys_pdeath, NULL);
 
-    init_psys(sbox, &rain_psys, 10,
+    sb_init_psys(sbox, &rain_psys, 10,
             PSYSNOSETUP, rain_psys_pupdate, rain_psys_pdeath, NULL);
 
 }
@@ -118,7 +118,7 @@ void setup(struct sandbox_t* sbox) {
 
 int main() {
 
-    struct sandbox_t sbox;
+    struct sbp_t sbox;
     if(!init_sandbox(&sbox, 700, 600, "[Sandbox]")) {
         return 1;
     }
@@ -128,8 +128,8 @@ int main() {
     setup(&sbox);
     run_sandbox(&sbox, loop, NULL);
 
-    delete_psys(&loop_psys);
-    delete_psys(&rain_psys);
+    sb_delete_psys(&loop_psys);
+    sb_delete_psys(&rain_psys);
     free_sandbox(&sbox);
 
     return 0;
