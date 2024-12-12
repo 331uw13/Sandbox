@@ -172,11 +172,11 @@ void update_sliders(struct sbp_t* sbox) {
         }
 
 
-        setbox(sbox, s->x, s->y, s->width+1, SLIDER_HEIGHT,
+        sb_setbox(sbox, s->x, s->y, s->width+1, SLIDER_HEIGHT,
                 s->r*0.25, s->g*0.25, s->b*0.25);
 
         float value_x = map(*s->valueptr, 0.0, 1.0, s->x, s->x+s->width);
-        setline(sbox, value_x, s->y, value_x, s->y+SLIDER_HEIGHT, s->r,s->g,s->b);
+        sb_setline(sbox, value_x, s->y, value_x, s->y+SLIDER_HEIGHT, s->r,s->g,s->b);
 
     }
 
@@ -445,7 +445,7 @@ void loop(struct sbp_t* sbox, void* ptr) {
                 b = c;
             }
 
-            setbox(sbox,
+            sb_setbox(sbox,
                     gx*g_grid_zoom + grid_pos_x,
                     gy*g_grid_zoom + grid_pos_y,
                     g_grid_zoom, 
@@ -465,18 +465,18 @@ void loop(struct sbp_t* sbox, void* ptr) {
         // side lines
         //
         // left
-        setline(sbox,
+        sb_setline(sbox,
                 2, palette_y_start,
                 2, palette_y_start+palette_height-1,
                 0.1,0.1,0.1);
         // right
-        setline(sbox, 
+        sb_setline(sbox, 
                 2+widthplus1, palette_y_start,
                 2+widthplus1, palette_y_start+palette_height-1,
                 0.1,0.1,0.1);
         
         // bottom line
-        setline(sbox,
+        sb_setline(sbox,
                 3, palette_y_start+palette_height-1,
                 2+widthplus1, palette_y_start+palette_height-1,
                 0.1,0.1,0.1);
@@ -489,16 +489,16 @@ void loop(struct sbp_t* sbox, void* ptr) {
             int y = i * widthplus1 + palette_y_start;
 
 
-            setbox(sbox, x, y, COLORPALETTE_BOX, COLORPALETTE_BOX, 
+            sb_setbox(sbox, x, y, COLORPALETTE_BOX, COLORPALETTE_BOX, 
                     g_colorpalette[i].red,
                     g_colorpalette[i].grn,
                     g_colorpalette[i].blu);
-            setline(sbox, x, y-1, x+COLORPALETTE_BOX, y-1,  0.1,0.1,0.1);
+            sb_setline(sbox, x, y-1, x+COLORPALETTE_BOX, y-1,  0.1,0.1,0.1);
         }
 
         // indicate selected color
 
-        setbox(sbox,
+        sb_setbox(sbox,
                 4+COLORPALETTE_BOX,
                 2+palette_y_start + (g_current_colorp_index * (COLORPALETTE_BOX+1)),
                 2,2,
@@ -552,7 +552,7 @@ void loop(struct sbp_t* sbox, void* ptr) {
 
     if(g_mode == MODE_DRAW) {
         struct color_t* color = &g_colorpalette[g_current_colorp_index];
-        fillcircle(sbox, 
+        sb_fillcircle(sbox, 
                 5+g_draw_size/2, 
                 5+g_draw_size/2, g_draw_size,
                 color->red, color->grn, color->blu
@@ -562,32 +562,32 @@ void loop(struct sbp_t* sbox, void* ptr) {
     else if(g_mode == MODE_ERASE) {
        
         // top horizontal line
-        setline(sbox, 
+        sb_setline(sbox, 
                 3, 3,
                 3+5, 3,
                 1.0, 0.7, 0.7);
         
         // left vertical line
-        setline(sbox, 
+        sb_setline(sbox, 
                 3, 3,
                 3, 3+7,
                 1.0, 0.7, 0.7);
 
 
         // middle horizontal line
-        setline(sbox, 
+        sb_setline(sbox, 
                 4, 4+2,
                 4+3, 4+2,
                 1.0, 0.7, 0.7);
  
         // bottom horizontal line
-        setline(sbox, 
+        sb_setline(sbox, 
                 3, 3+6,
                 3+5, 3+6,
                 1.0, 0.7, 0.7);
 
         // erase size.
-        fillcircle(sbox, 
+        sb_fillcircle(sbox, 
                 13+g_erase_size/2, 
                 5+g_erase_size/2, g_erase_size,
                 1.0, 0.6, 0.5);
@@ -598,15 +598,15 @@ void loop(struct sbp_t* sbox, void* ptr) {
 
     // draw cursor
 
-    setpixel(sbox, 
+    sb_setpixel(sbox, 
             sbox->mouse_col, sbox->mouse_row,
             0.3, 1.0, 0.3);
 
-    setpixel(sbox, 
+    sb_setpixel(sbox, 
             sbox->mouse_col+drag_cursor_mod, sbox->mouse_row,
             0.25, 0.66, 0.25);
 
-    setpixel(sbox, 
+    sb_setpixel(sbox, 
             sbox->mouse_col, sbox->mouse_row+drag_cursor_mod,
             0.25, 0.66, 0.25);
 
@@ -624,6 +624,59 @@ void dump_texture_data_stdout() {
                     g_texdata[i].red, g_texdata[i].grn, g_texdata[i].blu);
         } 
     }
+}
+
+void move_texpixel(int src_x, int src_y, int dst_x, int dst_y,
+        int* caller_dont_continue) {
+
+    const size_t max = TEX_MAX_COLUMN * TEX_MAX_ROW;
+    const size_t dst_tpindex = dst_y * TEX_MAX_COLUMN + dst_x;
+    const size_t src_tpindex = src_y * TEX_MAX_COLUMN + src_x;
+
+    struct texpixel_t* srctp = &g_texdata[src_tpindex];
+    struct texpixel_t* dsttp = &g_texdata[dst_tpindex];
+
+    if(!srctp->active) {
+        return;
+    }
+
+
+    if(dst_x < 0) {
+        *caller_dont_continue = 1;
+        return;
+    }
+    if(dst_x >= TEX_MAX_COLUMN) {
+        *caller_dont_continue = 1;
+        return;
+    }
+    if(dst_y < 0) {
+        *caller_dont_continue = 1;
+        return;
+    }
+    if(dst_y >= TEX_MAX_ROW) {
+        *caller_dont_continue = 1;
+        return;
+    }
+
+
+    dsttp->x = dst_x;
+    dsttp->y = dst_y;
+    dsttp->red = srctp->red;
+    dsttp->grn = srctp->grn;
+    dsttp->blu = srctp->blu;
+    dsttp->active = 1;
+
+    // clear the source
+
+    *srctp = (struct texpixel_t) {
+        .x = 0,
+        .y = 0,
+        .red = 0.0,
+        .grn = 0.0,
+        .blu = 0.0,
+        .active = 0
+    };
+
 }
 
 
@@ -700,8 +753,71 @@ static void key_callback(GLFWwindow* window, int key, int scancode, int action, 
                 break;
         }
     }
-    else { 
+    else {
         switch(key) {
+
+
+            case GLFW_KEY_LEFT:
+                {
+                    for(int x = 0; x < TEX_MAX_COLUMN; x++) {
+                        for(int y = TEX_MAX_ROW-1; y >= 0; y--) {
+                            int dont_continue = 0;
+                            move_texpixel(x, y,  x-1, y, &dont_continue);
+
+                            if(dont_continue) {
+                                goto endloop;
+                            }
+                        }     
+                    }
+                }
+                break;
+
+
+            case GLFW_KEY_RIGHT:
+                {
+                    for(int x = TEX_MAX_COLUMN-1; x >= 0; x--) {
+                        for(int y = TEX_MAX_ROW-1; y >= 0; y--) {
+                            int dont_continue = 0;
+                            move_texpixel(x, y,  x+1, y, &dont_continue);
+
+                            if(dont_continue) {
+                                goto endloop;
+                            }
+                        }     
+                    }
+                }
+                break;
+
+            case GLFW_KEY_UP:
+                {
+                    for(int y = 0; y < TEX_MAX_ROW; y++) {
+                        for(int x = 0; x < TEX_MAX_ROW; x++) {
+                            int dont_continue = 0;
+                            move_texpixel(x, y,  x, y-1, &dont_continue);
+
+                            if(dont_continue) {
+                                goto endloop;
+                            }
+                        }     
+                    }
+                }
+                break;
+
+
+            case GLFW_KEY_DOWN:
+                {
+                    for(int y = TEX_MAX_ROW-1; y >= 0; y--) {
+                        for(int x = TEX_MAX_COLUMN-1; x >= 0; x--) {
+                            int dont_continue = 0;
+                            move_texpixel(x, y,  x, y+1, &dont_continue);
+
+                            if(dont_continue) {
+                                goto endloop;
+                            }
+                        }     
+                    }
+                }
+                break;
 
             case GLFW_KEY_S:
                 write_texdata();
@@ -729,6 +845,7 @@ static void key_callback(GLFWwindow* window, int key, int scancode, int action, 
                 break;
         }
 
+endloop:
     }
 }
 
@@ -756,6 +873,7 @@ void print_controls() {
     print_control_desc_sub("X", "Paste selected color.");
     print_control_desc_sub("1", "Dim selected color.");
     print_control_desc_sub("2", "Brighten selected color.");
+    print_control_desc("CONTROL + UP/DOWN/LEFT/RIGHT", "Move every pixel by one cell");
     print_control_desc("MOUSE SCROLL + V", "Select color from palette.");
     print_control_desc("CONTROL + S", "Save.");
 
@@ -781,7 +899,7 @@ void print_usage(const char* firstarg) {
 void init_colorpalette() {
     for(int i = 0; i < COLORPALETTE_MAX; i++) {
         
-        rainbow_palette(sin((float)i*0.07),
+        sb_rainbow_palette(sin((float)i*0.07),
                 &g_colorpalette[i].red,
                 &g_colorpalette[i].grn,
                 &g_colorpalette[i].blu
@@ -876,6 +994,8 @@ int allocate_g_texdata() {
         fprintf(stderr, "Failed to allocate memory for texture data. size too big?\n");
         goto error;
     }
+
+    memset(g_texdata, 0, texdatasize);
 
     result = 1;
 
@@ -984,6 +1104,8 @@ int init_from_existing_file() {
     size_t num_colors = 0;
     int informed_toomanycolors = 0;
 
+
+
     for(size_t i = 0; 
             i < (size_t)texinfo.pixels * (SB_TEX_SEG_ELEMCOUNT);
                 i += (SB_TEX_SEG_ELEMCOUNT))
@@ -1038,7 +1160,6 @@ int init_from_existing_file() {
 
 
     for(size_t i = 0; i < num_colors; i++) {
-        printf("0x%x\n", hex_palette[i]);
 
         float redf = ((float)((hex_palette[i] >> 16) & 0xFF)) / 255.0;
         float grnf = ((float)((hex_palette[i] >> 8)  & 0xFF)) / 255.0;
@@ -1181,7 +1302,7 @@ int main(int argc, char** argv) {
 
     glfwSetKeyCallback(sbox.win, key_callback);
 
-    show_cursor(&sbox, 0);
+    sb_show_cursor(&sbox, 0);
     sbox.render_mode = RENDERMODE_POLL_EVENTS;
 
     run_sandbox(&sbox, loop, NULL);
